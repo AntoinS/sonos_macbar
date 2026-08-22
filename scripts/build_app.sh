@@ -20,8 +20,8 @@ cd "$(dirname "$0")/.."
 export CLANG_MODULE_CACHE_PATH="${CLANG_MODULE_CACHE_PATH:-${TMPDIR:-/tmp}/sonos_macbar-clang-cache}"
 export SWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE_PATH:-${TMPDIR:-/tmp}/sonos_macbar-swift-cache}"
 
-if [[ ! -f "Resources/${APP_ICON}" ]]; then
-    swift scripts/generate_app_icon.swift
+if [[ ! -f "Resources/${APP_ICON}" || "Resources/AppIconSource.png" -nt "Resources/${APP_ICON}" ]]; then
+    bash scripts/generate_app_icon.sh
 fi
 
 swift build -c release --disable-sandbox --scratch-path "$SCRATCH_DIR"
