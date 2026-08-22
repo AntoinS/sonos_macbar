@@ -44,6 +44,8 @@ playground.xcworkspace
 .swiftpm/
 
 .build/
+dist/
+Resources/AppIcon.iconset/
 
 # CocoaPods
 #

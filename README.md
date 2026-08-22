@@ -4,8 +4,6 @@ A small native macOS menu bar app for Sonos. It lives in the menu bar and gives
 you quick access to volume, mute, speech enhancement, and night sound without
 opening the full Sonos app. 🎵
 
-![Sonos Macbar Control Panel](docs/images/control-panel.png)
-
 ## What It Does
 
 - 🔊 Control Sonos volume directly from the macOS menu bar
@@ -24,16 +22,6 @@ speech enhancement, or switch on night sound in a few seconds.
 
 The interface is intentionally minimal and macOS-like: clear states, quiet
 controls, and no token-copying setup for normal users.
-
-## Screenshots
-
-### Control Panel
-
-![Minimal Sonos control panel](docs/images/control-panel.png)
-
-### Settings
-
-![Sonos Macbar settings](docs/images/settings.png)
 
 ## Sign In
 
@@ -89,6 +77,29 @@ Requirements:
 - macOS 14 or later
 - Xcode
 - Swift Package Manager
+
+## Install as a macOS App
+
+Build a release `.app` bundle:
+
+```bash
+bash scripts/build_app.sh
+```
+
+The app bundle will be created at:
+
+```text
+dist/Sonos Macbar.app
+```
+
+Copy it to your Applications folder:
+
+```bash
+cp -R "dist/Sonos Macbar.app" /Applications/
+```
+
+Then open **Sonos Macbar** from `/Applications`. It will appear in the macOS menu
+bar, not as a normal Dock window.
 
 Build locally:
 
