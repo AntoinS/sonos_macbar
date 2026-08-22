@@ -1,27 +1,17 @@
 # Sonos Macbar
 
-A small native macOS menu bar app for Sonos. It lives in the menu bar and gives
-you quick access to volume, mute, speech enhancement, and night sound without
-opening the full Sonos app. 🎵
+Sonos Macbar is a small macOS menu bar app for quick Sonos control. It lets you
+change volume, mute your speaker, and switch Voice or Night mode without opening
+the full Sonos app. 🎵
 
-## What It Does
+## Features
 
-- 🔊 Control Sonos volume directly from the macOS menu bar
-- 🔇 Mute your Sonos system with the speaker button
-- 🗣️ Toggle speech enhancement
-- 🌙 Toggle night sound
-- 🏠 View and switch the active Sonos room
-- 🔐 Connect once with your Sonos account in the browser
-- 🧰 Open settings directly from the menu bar panel
-
-## Why?
-
-Sonos is great, but the full app can feel heavy for small actions. Sonos Macbar
-is built for quick everyday control: change the volume, mute playback, enable
-speech enhancement, or switch on night sound in a few seconds.
-
-The interface is intentionally minimal and macOS-like: clear states, quiet
-controls, and no token-copying setup for normal users.
+- 🔊 Control volume from the menu bar
+- 🔇 Mute Sonos with one click
+- 🗣️ Toggle Voice mode
+- 🌙 Toggle Night mode
+- 🏠 Choose your Sonos room
+- 🔐 Sign in once with your Sonos account
 
 ## Screenshots
 
@@ -33,52 +23,41 @@ controls, and no token-copying setup for normal users.
 
 ![Sonos Macbar settings](assets/screenshots/settings.png)
 
-## Sign In
+## How It Works
 
-Sign-in uses the official Sonos OAuth flow in the browser. Normal users do not
-need to find, copy, or paste any token.
+1. Start **Sonos Macbar**.
+2. Click the Sonos icon in the macOS menu bar.
+3. Connect your Sonos account in the browser.
+4. Control your speaker directly from the menu bar.
 
-1. Launch the app.
-2. Open the Sonos Macbar menu bar panel.
-3. Click **Connect Sonos**.
-4. Sign in with Sonos in the browser and allow access.
-5. Return to the app.
-
-The app stores only local session state and short-lived Sonos access tokens in
-the macOS Keychain. No Sonos client secret is stored in the app.
+You do not need to copy or paste any tokens. The app stores the connection
+securely in the macOS Keychain.
 
 ## Settings
 
-From the settings view you can:
+The settings view lets you:
 
-- check the connection status
-- see the active room
-- reload available rooms
 - switch rooms
-- disconnect the Sonos account
-- reconnect when the current session is no longer valid
+- reload rooms
+- check the connection status
+- disconnect your Sonos account
 
-## Technical Overview
+## Install
 
-The app uses an OAuth broker at:
+Build the app:
 
-```text
-https://sonos-auth.alania-bonn.de
+```bash
+bash scripts/build_app.sh
 ```
 
-The broker handles the server-side Sonos OAuth token exchange. This keeps the
-Sonos client secret out of the macOS app.
+Copy it to Applications:
 
-Relevant endpoints:
+```bash
+cp -R "dist/Sonos Macbar.app" /Applications/
+```
 
-- `GET /health`
-- `POST /oauth/start`
-- `GET /oauth/status/{loginId}`
-- `POST /token`
-- `GET /oauth/callback`
-
-Server-side implementation notes are documented in
-[SONOS_AUTH_SERVER_HANDOFF.md](SONOS_AUTH_SERVER_HANDOFF.md).
+Then open **Sonos Macbar** from `/Applications`. It appears in the menu bar, not
+as a normal Dock window.
 
 ## Development
 
@@ -88,65 +67,14 @@ Requirements:
 - Xcode
 - Swift Package Manager
 
-## Install as a macOS App
-
-Build a release `.app` bundle:
-
-```bash
-bash scripts/build_app.sh
-```
-
-The app bundle will be created at:
-
-```text
-dist/Sonos Macbar.app
-```
-
-Copy it to your Applications folder:
-
-```bash
-cp -R "dist/Sonos Macbar.app" /Applications/
-```
-
-Then open **Sonos Macbar** from `/Applications`. It will appear in the macOS menu
-bar, not as a normal Dock window.
-
-Build locally:
-
-```bash
-swift build
-```
-
-Run the app:
+Run locally:
 
 ```bash
 swift run sonos_macbar
 ```
 
-For local development without the OAuth broker, debug builds can use a temporary
-Sonos access token:
-
-```bash
-export SONOS_ACCESS_TOKEN="YOUR_LOCAL_ACCESS_TOKEN"
-swift run sonos_macbar
-```
-
-The Keychain session takes priority over this debug fallback.
-
-## Security
-
-Before committing, run the lightweight secret scan:
+Before committing, run:
 
 ```bash
 bash scripts/check_secrets.sh
 ```
-
-The check looks for accidentally committed access tokens, refresh tokens, client
-secrets, and authorization headers.
-
-## Known Server Dependency
-
-If the Sonos page keeps showing a loading spinner after the user allows access,
-the issue is usually not in the macOS app. The OAuth broker must make sure that
-`/oauth/callback` returns a final HTML response or redirect after the token
-exchange and marks the login session as `complete`.
