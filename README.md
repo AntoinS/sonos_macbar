@@ -23,6 +23,16 @@ speech enhancement, or switch on night sound in a few seconds.
 The interface is intentionally minimal and macOS-like: clear states, quiet
 controls, and no token-copying setup for normal users.
 
+## Screenshots
+
+### Control Panel
+
+![Sonos Macbar control panel](assets/screenshots/control-panel.png)
+
+### Settings
+
+![Sonos Macbar settings](assets/screenshots/settings.png)
+
 ## Sign In
 
 Sign-in uses the official Sonos OAuth flow in the browser. Normal users do not
