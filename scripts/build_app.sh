@@ -15,14 +15,19 @@ MACOS_DIR="${CONTENTS_DIR}/MacOS"
 RESOURCES_DIR="${CONTENTS_DIR}/Resources"
 SOURCE_ICON="Resources/AppIcon/Icon Exports/Icon-iOS-Default-1024x1024@1x.png"
 APP_ICON="AppIcon.icns"
+GENERATED_APP_ICON="${TMPDIR:-/tmp}/sonos_macbar-${APP_ICON}"
+MENU_BAR_ICON_SOURCE="Resources/AppIcon/Icon Exports/Icon-iOS-@1x_clear.png"
+MENU_BAR_ICON="MenuBarIcon.png"
 
 cd "$(dirname "$0")/.."
 
 export CLANG_MODULE_CACHE_PATH="${CLANG_MODULE_CACHE_PATH:-${TMPDIR:-/tmp}/sonos_macbar-clang-cache}"
 export SWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE_PATH:-${TMPDIR:-/tmp}/sonos_macbar-swift-cache}"
 
-if [[ ! -f "Resources/${APP_ICON}" || "${SOURCE_ICON}" -nt "Resources/${APP_ICON}" ]]; then
-    bash scripts/generate_app_icon.sh
+APP_ICON_SOURCE="Resources/${APP_ICON}"
+if [[ ! -f "${APP_ICON_SOURCE}" || "${SOURCE_ICON}" -nt "${APP_ICON_SOURCE}" ]]; then
+    SONOS_MACBAR_APP_ICON_OUTPUT="${GENERATED_APP_ICON}" bash scripts/generate_app_icon.sh
+    APP_ICON_SOURCE="${GENERATED_APP_ICON}"
 fi
 
 swift build -c release --disable-sandbox --scratch-path "$SCRATCH_DIR"
@@ -32,7 +37,8 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
 cp "${SCRATCH_DIR}/release/${EXECUTABLE_NAME}" "${MACOS_DIR}/${BUNDLE_EXECUTABLE_NAME}"
 chmod +x "${MACOS_DIR}/${BUNDLE_EXECUTABLE_NAME}"
-cp "Resources/${APP_ICON}" "${RESOURCES_DIR}/${APP_ICON}"
+cp "${APP_ICON_SOURCE}" "${RESOURCES_DIR}/${APP_ICON}"
+cp "${MENU_BAR_ICON_SOURCE}" "${RESOURCES_DIR}/${MENU_BAR_ICON}"
 
 cat > "${CONTENTS_DIR}/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -83,6 +89,10 @@ cat > "${CONTENTS_DIR}/Info.plist" <<PLIST
 PLIST
 
 printf "APPL????" > "${CONTENTS_DIR}/PkgInfo"
+
+if command -v xattr >/dev/null 2>&1; then
+    xattr -cr "$APP_DIR"
+fi
 
 if command -v codesign >/dev/null 2>&1; then
     codesign --force --sign - "$APP_DIR" >/dev/null

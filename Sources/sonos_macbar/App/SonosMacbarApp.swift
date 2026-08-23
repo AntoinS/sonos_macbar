@@ -45,11 +45,7 @@ private final class StatusBarController: NSObject {
         statusItem.isVisible = true
 
         if let button = statusItem.button {
-            button.image = NSImage(
-                systemSymbolName: "hifispeaker.2.fill",
-                accessibilityDescription: "Sonos Macbar"
-            )
-            button.image?.isTemplate = true
+            button.image = Self.menuBarIcon()
             button.target = self
             button.action = #selector(handleStatusItemClick(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -77,6 +73,27 @@ private final class StatusBarController: NSObject {
         self.statusItem = statusItem
         self.popover = popover
         self.contextMenu = menu
+    }
+
+    private static func menuBarIcon() -> NSImage? {
+        let resourceName = "MenuBarIcon"
+        let resourceExtension = "png"
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appending(path: "Resources/AppIcon/Icon Exports/Icon-iOS-@1x_clear.png")
+
+        let image = Bundle.main.url(forResource: resourceName, withExtension: resourceExtension)
+            .flatMap(NSImage.init(contentsOf:))
+            ?? NSImage(contentsOf: sourceURL)
+            ?? NSImage(systemSymbolName: "hifispeaker.2.fill", accessibilityDescription: "Sonos Macbar")
+
+        image?.size = NSSize(width: 18, height: 18)
+        image?.isTemplate = true
+        image?.accessibilityDescription = "Sonos Macbar"
+        return image
     }
 
     @objc private func handleStatusItemClick(_ sender: NSStatusBarButton) {
