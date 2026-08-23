@@ -3,9 +3,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-SOURCE_ICON="Resources/AppIcon/Icon Exports/Icon-iOS-Default-1024x1024@1x.png"
+SOURCE_ICON="Resources/AppIcon/app-icon.png"
 ICONSET_DIR="${TMPDIR:-/tmp}/sonos_macbar-appicon.iconset"
-OUTPUT_ICON="${SONOS_MACBAR_APP_ICON_OUTPUT:-Resources/AppIcon.icns}"
+OUTPUT_ICON="${SONOS_MACBAR_APP_ICON_OUTPUT:-Resources/AppIcon/app-icon.icns}"
 
 if [[ ! -f "$SOURCE_ICON" ]]; then
     echo "Missing $SOURCE_ICON" >&2

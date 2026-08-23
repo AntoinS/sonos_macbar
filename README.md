@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="Resources/AppIcon/Icon%20Exports/Icon-iOS-ClearDark-1024x1024@1x_clear.png" alt="Sonos Macbar icon" width="180" />
+  <img src="Resources/AppIcon/app-icon.png" alt="Sonos Macbar icon" width="180" />
 
   <h1>Sonos Macbar</h1>
 
@@ -52,6 +52,15 @@ macOS Keychain.
 
 ## Install
 
+Install with Homebrew:
+
+```bash
+brew tap AntoinS/sonos_macbar
+brew install --cask sonos-macbar
+```
+
+Or build the app manually:
+
 Build the app:
 
 ```bash
@@ -86,6 +95,26 @@ Before committing, run the secret scan:
 ```bash
 bash scripts/check_secrets.sh
 ```
+
+Package a Homebrew/GitHub release:
+
+```bash
+bash scripts/package_release.sh
+```
+
+Upload the generated `dist/Sonos-Macbar-0.1.0.zip` file to a GitHub release
+named `v0.1.0`. The Homebrew cask downloads that release asset.
+
+To publish a release through GitHub Actions:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+## License
+
+Sonos Macbar is available under the MIT License. See [LICENSE](LICENSE).
 
 <div align="center">
   <sub>Built with SwiftUI for macOS.</sub>

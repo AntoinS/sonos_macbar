@@ -47,6 +47,7 @@ playground.xcworkspace
 dist/
 docs/images/
 Resources/AppIcon.iconset/
+Resources/AppIcon/*.icns
 
 # CocoaPods
 #

@@ -83,7 +83,7 @@ private final class StatusBarController: NSObject {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appending(path: "Resources/AppIcon/Icon Exports/Icon-iOS-@1x_clear.png")
+            .appending(path: "Resources/AppIcon/menu-bar-icon.png")
 
         let image = Bundle.main.url(forResource: resourceName, withExtension: resourceExtension)
             .flatMap(NSImage.init(contentsOf:))
