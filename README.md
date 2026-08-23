@@ -57,12 +57,24 @@ Install with Homebrew:
 ```bash
 brew tap AntoinS/sonos_macbar \
   https://github.com/AntoinS/sonos_macbar.git
-brew install --cask --no-quarantine antoins/sonos_macbar/sonos-macbar
+brew install --cask antoins/sonos_macbar/sonos-macbar
 ```
 
-The `--no-quarantine` option is a free workaround for testing unsigned builds
-and bypasses macOS Gatekeeper's quarantine check. A Developer ID signature and
-Apple notarization are required for a warning-free public release.
+### First launch on macOS
+
+The current release is not yet signed and notarized by Apple. If macOS shows
+the message that Apple cannot check **Sonos Macbar**, open **System Settings →
+Privacy & Security** and click **Open Anyway**. Confirm the dialog once; future
+launches should work normally on that Mac.
+
+Alternatively, after installing with Homebrew, run:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Sonos Macbar.app"
+open "/Applications/Sonos Macbar.app"
+```
+
+This one-time step removes the download quarantine from the local copy.
 
 Or build the app manually:
 
