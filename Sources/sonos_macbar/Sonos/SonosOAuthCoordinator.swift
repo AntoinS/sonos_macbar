@@ -7,19 +7,30 @@ import Observation
 final class SonosOAuthCoordinator {
     private let authClient: SonosAuthClient
     private let tokenStore: SonosTokenStore
+    private let auth: SonosAuth?
     private var loginTask: Task<Void, Never>?
     private var activeLoginId: String?
     private var authorizationURL: URL?
 
     private(set) var authState: SonosAuthState = .checking
 
-    init(authClient: SonosAuthClient = SonosAuthClient(), tokenStore: SonosTokenStore = SonosTokenStore()) {
+    init(
+        authClient: SonosAuthClient = SonosAuthClient(),
+        tokenStore: SonosTokenStore = SonosTokenStore(),
+        auth: SonosAuth? = nil
+    ) {
         self.authClient = authClient
         self.tokenStore = tokenStore
+        self.auth = auth
     }
 
     func prepareAtLaunch() async {
-        if await tokenStore.accessToken() != nil {
+        if let auth, (try? await auth.accessToken()) != nil {
+            authState = .connected
+            return
+        }
+
+        if auth == nil, await tokenStore.savedCredentials()?.validAccessToken != nil {
             authState = .connected
             return
         }
@@ -64,6 +75,7 @@ final class SonosOAuthCoordinator {
     func disconnect() async throws {
         cancelLogin()
         try await tokenStore.deleteAllSonosCredentials()
+        await auth?.clearCachedAccessToken()
         authState = .disconnected
     }
 
@@ -92,9 +104,15 @@ final class SonosOAuthCoordinator {
             try await Self.pollLogin(loginId: start.loginId, authClient: authClient)
 
             authState = .refreshing
-            try await tokenStore.saveBrokerSessionId(start.loginId)
             let token = try await authClient.token(loginId: start.loginId)
-            try await tokenStore.saveAccessToken(token.accessToken, expiresAt: token.expiresAt)
+            try await tokenStore.saveCredentials(
+                SonosStoredCredentials(
+                    brokerSessionId: start.loginId,
+                    accessToken: token.accessToken,
+                    accessTokenExpiresAt: token.expiresAt
+                )
+            )
+            await auth?.cacheAccessToken(token.accessToken, expiresAt: token.expiresAt)
             authState = .connected
             await onConnected()
         } catch is CancellationError {

@@ -12,6 +12,16 @@ actor MockSonosService: SonosAPI {
         return players
     }
 
+    func refreshPlayerState(_ player: SonosPlayer, includingSource: Bool) async throws -> SonosPlayer {
+        try await Task.sleep(for: .milliseconds(80))
+
+        guard let currentPlayer = players.first(where: { $0.id == player.id }) else {
+            throw SonosAPIError.playerNotFound
+        }
+
+        return currentPlayer
+    }
+
     func setVolume(_ volume: Int, for playerID: SonosPlayer.ID) async throws -> SonosPlayer {
         try await update(playerID: playerID) { player in
             player.volume = min(100, max(0, volume))

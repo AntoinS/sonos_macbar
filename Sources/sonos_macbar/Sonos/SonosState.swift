@@ -179,13 +179,32 @@ final class SonosState {
         }
     }
 
+    func pollSelectedPlayerState() async {
+        var pollCount = 0
+
+        while !Task.isCancelled {
+            if let player = selectedPlayer, !isAuthenticationRequired {
+                await refreshPlayerState(player, includingSource: pollCount % 4 == 0)
+                pollCount += 1
+            }
+
+            do {
+                try await Task.sleep(for: .milliseconds(1500))
+            } catch {
+                break
+            }
+        }
+    }
+
     func accountSnapshot(language: AppLanguage) async -> SonosAccountSnapshot {
-        SonosAccountSnapshot(
+        let isConnected = authState == .connected && !isAuthenticationRequired
+
+        return SonosAccountSnapshot(
             connectionStatus: connectionStatus(for: language),
             authStatus: authState.userMessage(for: language),
             selectedRoomName: selectedPlayer?.roomName,
-            hasBrokerSession: await tokenStore.brokerSessionId() != nil,
-            hasAccessToken: await tokenStore.savedAccessToken() != nil
+            hasBrokerSession: isConnected,
+            hasAccessToken: isConnected
         )
     }
 
@@ -238,6 +257,16 @@ final class SonosState {
             isAuthenticationRequired = true
         default:
             break
+        }
+    }
+
+    private func refreshPlayerState(_ player: SonosPlayer, includingSource: Bool) async {
+        do {
+            replacePlayer(try await service.refreshPlayerState(player, includingSource: includingSource))
+        } catch {
+            guard !Self.isCancellationError(error) else { return }
+            updateAuthenticationRequirement(for: error)
+            errorMessage = error.localizedDescription
         }
     }
 

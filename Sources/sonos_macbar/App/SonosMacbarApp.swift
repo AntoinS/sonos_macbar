@@ -10,7 +10,7 @@ struct SonosMacbarApp: App {
         let tokenStore = SonosTokenStore()
         let authClient = SonosAuthClient()
         let auth = SonosAuth(authClient: authClient, tokenStore: tokenStore)
-        let oauthCoordinator = SonosOAuthCoordinator(authClient: authClient, tokenStore: tokenStore)
+        let oauthCoordinator = SonosOAuthCoordinator(authClient: authClient, tokenStore: tokenStore, auth: auth)
         let state = SonosState(
             service: SonosService(auth: auth),
             tokenStore: tokenStore,

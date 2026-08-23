@@ -283,6 +283,15 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         }
     }
 
+    var source: String {
+        switch self {
+        case .english:
+            "Source"
+        case .german:
+            "Quelle"
+        }
+    }
+
     func volumeValue(isMuted: Bool, volume: Int) -> String {
         isMuted ? muted : "\(volume) percent"
     }

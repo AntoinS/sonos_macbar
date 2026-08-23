@@ -5,6 +5,7 @@ struct SonosTokenStore: Sendable {
     private let environment: [String: String]
     private let developmentAccessTokenEnvironmentKey: String
 
+    private let credentialsService = "de.alania.sonos-macbar.credentials"
     private let brokerSessionService = "de.alania.sonos-macbar.broker-session"
     private let accessTokenService = "de.alania.sonos-macbar.access-token"
     private let accessExpiryService = "de.alania.sonos-macbar.access-expiry"
@@ -18,56 +19,52 @@ struct SonosTokenStore: Sendable {
         self.developmentAccessTokenEnvironmentKey = configuration.developmentAccessTokenEnvironmentKey
     }
 
-    func accessToken() async -> String? {
-        if let keychainToken = await savedAccessToken(), await isAccessTokenValid() {
-            return keychainToken
+    func savedCredentials() async -> SonosStoredCredentials? {
+        await keychainData(service: credentialsService).flatMap { data in
+            try? JSONDecoder().decode(SonosStoredCredentials.self, from: data)
         }
-
-        #if DEBUG
-        return environment[developmentAccessTokenEnvironmentKey].flatMap(Self.nonEmptyToken)
-        #else
-        return nil
-        #endif
     }
 
-    func savedAccessToken() async -> String? {
-        await keychainString(service: accessTokenService)
-    }
-
-    func brokerSessionId() async -> String? {
+    func legacyBrokerSessionId() async -> String? {
         await keychainString(service: brokerSessionService)
     }
 
-    func saveBrokerSessionId(_ loginId: String) async throws {
-        try await saveString(loginId, service: brokerSessionService)
+    func developmentAccessToken() -> String? {
+        #if DEBUG
+        environment[developmentAccessTokenEnvironmentKey].flatMap(Self.nonEmptyToken)
+        #else
+        nil
+        #endif
     }
 
-    func saveAccessToken(_ token: String, expiresAt: Date? = nil) async throws {
-        try await saveString(token, service: accessTokenService)
+    func saveCredentials(_ credentials: SonosStoredCredentials) async throws {
+        try await saveData(JSONEncoder().encode(credentials), service: credentialsService)
+        try await deleteLegacyCredentials()
+    }
 
-        if let expiresAt {
-            try await saveString(String(Int(expiresAt.timeIntervalSince1970)), service: accessExpiryService)
+    func deleteAccessTokenFromCredentials() async throws {
+        guard var credentials = await savedCredentials() else {
+            try await deleteString(service: accessTokenService)
+            try await deleteString(service: accessExpiryService)
+            return
         }
-    }
 
-    func deleteSavedAccessToken() async throws {
+        credentials.accessToken = nil
+        credentials.accessTokenExpiresAt = nil
+        try await saveData(JSONEncoder().encode(credentials), service: credentialsService)
         try await deleteString(service: accessTokenService)
         try await deleteString(service: accessExpiryService)
     }
 
     func deleteAllSonosCredentials() async throws {
+        try await deleteString(service: credentialsService)
+        try await deleteLegacyCredentials()
+    }
+
+    private func deleteLegacyCredentials() async throws {
         try await deleteString(service: brokerSessionService)
         try await deleteString(service: accessTokenService)
         try await deleteString(service: accessExpiryService)
-    }
-
-    private func isAccessTokenValid() async -> Bool {
-        guard let expiryString = await keychainString(service: accessExpiryService),
-              let expiryTimestamp = TimeInterval(expiryString) else {
-            return true
-        }
-
-        return Date(timeIntervalSince1970: expiryTimestamp) > Date().addingTimeInterval(120)
     }
 
     private func saveString(_ value: String, service: String) async throws {
@@ -76,6 +73,10 @@ struct SonosTokenStore: Sendable {
             throw SonosTokenStoreError.emptyToken
         }
 
+        try await saveData(data, service: service)
+    }
+
+    private func saveData(_ data: Data, service: String) async throws {
         let query = keychainBaseQuery(service: service)
         let attributes: [String: Any] = [
             kSecValueData as String: data
@@ -108,6 +109,15 @@ struct SonosTokenStore: Sendable {
     }
 
     private func keychainString(service: String) async -> String? {
+        guard let data = await keychainData(service: service),
+              let value = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+
+        return Self.nonEmptyToken(value)
+    }
+
+    private func keychainData(service: String) async -> Data? {
         var query = keychainBaseQuery(service: service)
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         query[kSecReturnData as String] = true
@@ -115,12 +125,11 @@ struct SonosTokenStore: Sendable {
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         guard status == errSecSuccess,
-              let data = item as? Data,
-              let value = String(data: data, encoding: .utf8) else {
+              let data = item as? Data else {
             return nil
         }
 
-        return Self.nonEmptyToken(value)
+        return data
     }
 
     private func keychainBaseQuery(service: String) -> [String: Any] {
@@ -134,6 +143,22 @@ struct SonosTokenStore: Sendable {
     private static func nonEmptyToken(_ token: String) -> String? {
         let trimmedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmedToken.isEmpty ? nil : trimmedToken
+    }
+}
+
+struct SonosStoredCredentials: Codable, Equatable, Sendable {
+    var brokerSessionId: String
+    var accessToken: String?
+    var accessTokenExpiresAt: Date?
+
+    var validAccessToken: String? {
+        guard let accessToken = accessToken?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !accessToken.isEmpty else {
+            return nil
+        }
+
+        guard let accessTokenExpiresAt else { return accessToken }
+        return accessTokenExpiresAt > Date().addingTimeInterval(120) ? accessToken : nil
     }
 }
 

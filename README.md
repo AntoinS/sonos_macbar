@@ -25,6 +25,8 @@
 ## Features
 
 - 🔊 Control speaker volume directly from the menu bar
+- 📡 See the current playback source at a glance
+- 🔁 Keep the volume slider in sync with external remote changes
 - 🔇 Mute your Sonos with one click
 - 🗣️ Toggle Voice enhancement
 - 🌙 Toggle Night mode
@@ -35,10 +37,21 @@
 ## Screenshots
 
 <div align="center">
-  <img src="assets/screenshots/control-panel-clean.png" width="360" alt="Sonos Macbar control panel" />
+  <img src="assets/screenshots/connect.png" width="360" alt="Sonos Macbar connect screen" />
+  <br /><br />
+  <img src="assets/screenshots/control-panel.png" width="360" alt="Sonos Macbar control panel with playback source" />
   &nbsp;&nbsp;
-  <img src="assets/screenshots/settings-clean.png" width="360" alt="Sonos Macbar settings" />
+  <img src="assets/screenshots/settings.png" width="360" alt="Sonos Macbar settings" />
 </div>
+
+## Latest Update
+
+### v0.1.1
+
+- Live volume refresh: the slider now follows volume changes made with a TV or Sonos remote.
+- Playback source display: the control panel now shows the current source, such as TV Audio.
+- Cleaner Keychain handling: credentials are stored in one combined entry to reduce repeated macOS prompts.
+- Updated README screenshots.
 
 ## How it works
 

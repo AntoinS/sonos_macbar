@@ -18,10 +18,13 @@ actor SonosService: SonosAPI {
 
         let groupsResponse: GroupsResponse = try await send(.get, path: "households/\(householdID)/groups")
 
+        let groupIDByPlayerID = groupsResponse.groupIDByPlayerID
+
         let players = await withTaskGroup(of: SonosPlayer?.self) { group in
             for player in groupsResponse.players {
+                let groupID = groupIDByPlayerID[player.id]
                 group.addTask { [self] in
-                    await makePlayer(from: player)
+                    await makePlayer(from: player, groupID: groupID)
                 }
             }
 
@@ -68,17 +71,34 @@ actor SonosService: SonosAPI {
         }
     }
 
-    private func makePlayer(from player: SonosPlayerResponse) async -> SonosPlayer {
+    func refreshPlayerState(_ player: SonosPlayer, includingSource: Bool) async throws -> SonosPlayer {
+        let volume = try await currentPlayerVolume(for: player.id)
+        let source = includingSource ? await playbackSource(for: player.groupID) : nil
+
+        return try updateCachedPlayer(player.id) { cachedPlayer in
+            cachedPlayer.volume = volume.volume
+            cachedPlayer.muted = volume.muted
+            if includingSource {
+                cachedPlayer.playbackSource = source ?? player.playbackSource
+            }
+        }
+    }
+
+    private func makePlayer(from player: SonosPlayerResponse, groupID: String?) async -> SonosPlayer {
         async let volume = playerVolume(for: player.id)
         async let options = homeTheaterOptions(for: player.id, isHomeTheaterCapable: player.capabilities.contains("HT_PLAYBACK"))
+        async let source = playbackSource(for: groupID)
 
         let resolvedVolume = await volume
         let resolvedOptions = await options
+        let resolvedSource = await source
 
         return SonosPlayer(
             id: player.id,
+            groupID: groupID,
             roomName: player.name,
             deviceName: player.iconDisplayName,
+            playbackSource: resolvedSource,
             volume: resolvedVolume?.volume ?? 0,
             muted: resolvedVolume?.muted ?? false,
             enhanceDialog: resolvedOptions?.enhanceDialog ?? false,
@@ -89,7 +109,17 @@ actor SonosService: SonosAPI {
     }
 
     private func playerVolume(for playerID: SonosPlayer.ID) async -> PlayerVolumeResponse? {
-        try? await send(.get, path: "players/\(playerID)/playerVolume")
+        try? await currentPlayerVolume(for: playerID)
+    }
+
+    private func currentPlayerVolume(for playerID: SonosPlayer.ID) async throws -> PlayerVolumeResponse {
+        try await send(.get, path: "players/\(playerID)/playerVolume")
+    }
+
+    private func playbackSource(for groupID: String?) async -> String? {
+        guard let groupID else { return nil }
+        let metadata: PlaybackMetadataResponse? = try? await send(.get, path: "groups/\(groupID)/playbackMetadata")
+        return metadata?.sourceName
     }
 
     private func homeTheaterOptions(for playerID: SonosPlayer.ID, isHomeTheaterCapable: Bool) async -> HomeTheaterOptionsResponse? {
@@ -201,15 +231,49 @@ private struct HouseholdResponse: Decodable {
 }
 
 private struct GroupsResponse: Decodable {
+    let groups: [SonosGroupResponse]
     let players: [SonosPlayerResponse]
 
+    var groupIDByPlayerID: [String: String] {
+        groups.reduce(into: [:]) { result, group in
+            for playerID in group.playerIDs {
+                result[playerID] = group.id
+            }
+
+            if let coordinatorID = group.coordinatorID {
+                result[coordinatorID] = group.id
+            }
+        }
+    }
+
     private enum CodingKeys: String, CodingKey {
+        case groups
         case players
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        groups = try container.decodeIfPresent([SonosGroupResponse].self, forKey: .groups) ?? []
         players = try container.decodeIfPresent([SonosPlayerResponse].self, forKey: .players) ?? []
+    }
+}
+
+private struct SonosGroupResponse: Decodable {
+    let id: String
+    let coordinatorID: String?
+    let playerIDs: [String]
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case coordinatorID = "coordinatorId"
+        case playerIDs = "playerIds"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        coordinatorID = try container.decodeIfPresent(String.self, forKey: .coordinatorID)
+        playerIDs = try container.decodeIfPresent([String].self, forKey: .playerIDs) ?? []
     }
 }
 
@@ -276,6 +340,52 @@ private struct HomeTheaterOptionsResponse: Decodable {
     let enhanceDialog: Bool
 }
 
+private struct PlaybackMetadataResponse: Decodable {
+    let container: PlaybackContainer?
+    let currentItem: PlaybackItem?
+    let streamInfo: String?
+
+    var sourceName: String? {
+        firstNonEmpty(container?.sourceName, currentItem?.sourceName, streamInfo)
+    }
+}
+
+private struct PlaybackContainer: Decodable {
+    let name: String?
+    let type: String?
+    let service: PlaybackService?
+
+    var sourceName: String? {
+        firstNonEmpty(service?.name, name, normalizedType)
+    }
+
+    private var normalizedType: String? {
+        guard let type, !type.isEmpty else { return nil }
+        return type
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: ".", with: " ")
+            .capitalized
+    }
+}
+
+private struct PlaybackItem: Decodable {
+    let service: PlaybackService?
+    let track: PlaybackTrack?
+    let streamInfo: String?
+
+    var sourceName: String? {
+        firstNonEmpty(service?.name, track?.service?.name, streamInfo)
+    }
+}
+
+private struct PlaybackTrack: Decodable {
+    let service: PlaybackService?
+}
+
+private struct PlaybackService: Decodable {
+    let name: String?
+}
+
 private struct SonosErrorResponse: Decodable {
     let globalError: GlobalError?
 
@@ -286,4 +396,14 @@ private struct SonosErrorResponse: Decodable {
     struct GlobalError: Decodable {
         let reason: String?
     }
+}
+
+private func firstNonEmpty(_ values: String?...) -> String? {
+    values.compactMap { value -> String? in
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+            return nil
+        }
+
+        return value
+    }.first
 }

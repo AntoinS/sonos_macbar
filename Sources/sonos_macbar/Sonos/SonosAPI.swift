@@ -2,6 +2,7 @@ import Foundation
 
 protocol SonosAPI: Sendable {
     func fetchPlayers() async throws -> [SonosPlayer]
+    func refreshPlayerState(_ player: SonosPlayer, includingSource: Bool) async throws -> SonosPlayer
     func setVolume(_ volume: Int, for playerID: SonosPlayer.ID) async throws -> SonosPlayer
     func setMuted(_ isMuted: Bool, for playerID: SonosPlayer.ID) async throws -> SonosPlayer
     func setEnhanceDialog(_ isEnabled: Bool, for playerID: SonosPlayer.ID) async throws -> SonosPlayer

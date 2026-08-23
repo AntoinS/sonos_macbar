@@ -69,6 +69,9 @@ struct ControlPanelView: View {
         .task {
             await state.start()
         }
+        .task(id: state.selectedPlayerID) {
+            await state.pollSelectedPlayerState()
+        }
     }
 }
 

@@ -23,6 +23,19 @@ struct PlayerHeaderView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+
+                if let playbackSource = player.playbackSource, !playbackSource.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "dot.radiowaves.left.and.right")
+                            .imageScale(.small)
+                            .accessibilityLabel(language.source)
+
+                        Text(playbackSource)
+                            .lineLimit(1)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
             }
 
             Spacer(minLength: 8)
