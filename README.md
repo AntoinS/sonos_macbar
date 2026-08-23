@@ -1,46 +1,54 @@
-# Sonos Macbar
+<div align="center">
+  <img src="Resources/AppIcon/Icon%20Exports/Icon-iOS-Default-1024x1024@1x.png" alt="Sonos Macbar icon" width="180" />
 
-Sonos Macbar is a small macOS menu bar app for quick Sonos control. It lets you
-change volume, mute your speaker, and switch Voice or Night mode without opening
-the full Sonos app. 🎵
+  <h1>Sonos Macbar</h1>
+
+  <p>
+    Quick Sonos control from your macOS menu bar.<br />
+    Small, native, and designed to stay out of your way.
+  </p>
+
+  <p>
+    <a href="#features">Features</a> ·
+    <a href="#screenshots">Screenshots</a> ·
+    <a href="#install">Install</a> ·
+    <a href="#development">Development</a>
+  </p>
+
+  <p>
+    <img src="https://img.shields.io/badge/macOS-14%2B-111827?style=for-the-badge&logo=apple&logoColor=white" alt="macOS 14 or later" />
+    <img src="https://img.shields.io/badge/Swift-SwiftUI-F05138?style=for-the-badge&logo=swift&logoColor=white" alt="Swift and SwiftUI" />
+    <img src="https://img.shields.io/badge/app-menu%20bar-2563EB?style=for-the-badge" alt="Menu bar app" />
+  </p>
+</div>
 
 ## Features
 
-- 🔊 Control volume from the menu bar
-- 🔇 Mute Sonos with one click
-- 🗣️ Toggle Voice mode
+- 🔊 Control speaker volume directly from the menu bar
+- 🔇 Mute your Sonos with one click
+- 🗣️ Toggle Voice enhancement
 - 🌙 Toggle Night mode
-- 🏠 Choose your Sonos room
-- 🔐 Sign in once with your Sonos account
+- 🏠 Choose between Sonos rooms
+- 🔐 Sign in once through the official Sonos OAuth flow
+- 🔑 Store credentials securely in the macOS Keychain
 
 ## Screenshots
 
-### Control Panel
+<div align="center">
+  <img src="assets/screenshots/control-panel-clean.png" width="360" alt="Sonos Macbar control panel" />
+  &nbsp;&nbsp;
+  <img src="assets/screenshots/settings-clean.png" width="360" alt="Sonos Macbar settings" />
+</div>
 
-![Sonos Macbar control panel](assets/screenshots/control-panel.png)
-
-### Settings
-
-![Sonos Macbar settings](assets/screenshots/settings.png)
-
-## How It Works
+## How it works
 
 1. Start **Sonos Macbar**.
 2. Click the Sonos icon in the macOS menu bar.
 3. Connect your Sonos account in the browser.
-4. Control your speaker directly from the menu bar.
+4. Control your speaker without opening the full Sonos app.
 
-You do not need to copy or paste any tokens. The app stores the connection
-securely in the macOS Keychain.
-
-## Settings
-
-The settings view lets you:
-
-- switch rooms
-- reload rooms
-- check the connection status
-- disconnect your Sonos account
+No tokens need to be copied or pasted. The app keeps the connection in the
+macOS Keychain.
 
 ## Install
 
@@ -56,8 +64,8 @@ Copy it to Applications:
 cp -R "dist/Sonos Macbar.app" /Applications/
 ```
 
-Then open **Sonos Macbar** from `/Applications`. It appears in the menu bar, not
-as a normal Dock window.
+Then open **Sonos Macbar** from `/Applications`. It runs as a menu bar app and
+does not open a normal Dock window.
 
 ## Development
 
@@ -73,8 +81,12 @@ Run locally:
 swift run sonos_macbar
 ```
 
-Before committing, run:
+Before committing, run the secret scan:
 
 ```bash
 bash scripts/check_secrets.sh
 ```
+
+<div align="center">
+  <sub>Built with SwiftUI for macOS.</sub>
+</div>
