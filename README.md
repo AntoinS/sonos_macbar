@@ -44,15 +44,6 @@
   <img src="assets/screenshots/settings.png" width="360" alt="Sonos Macbar settings" />
 </div>
 
-## Latest Update
-
-### v0.1.1
-
-- Live volume refresh: the slider now follows volume changes made with a TV or Sonos remote.
-- Playback source display: the control panel now shows the current source, such as TV Audio.
-- Cleaner Keychain handling: credentials are stored in one combined entry to reduce repeated macOS prompts.
-- Updated README screenshots.
-
 ## How it works
 
 1. Start **Sonos Macbar**.
