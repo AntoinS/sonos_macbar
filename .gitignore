@@ -48,6 +48,7 @@ dist/
 docs/images/
 Resources/AppIcon.iconset/
 Resources/AppIcon/*.icns
+Resources/AppIcon/Icon Exports/
 
 # CocoaPods
 #
