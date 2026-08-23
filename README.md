@@ -76,41 +76,15 @@ cp -R "dist/Sonos Macbar.app" /Applications/
 Then open **Sonos Macbar** from `/Applications`. It runs as a menu bar app and
 does not open a normal Dock window.
 
-## Development
+## Uninstall
 
-Requirements:
-
-- macOS 14 or later
-- Xcode
-- Swift Package Manager
-
-Run locally:
+If installed with Homebrew:
 
 ```bash
-swift run sonos_macbar
+brew uninstall --cask sonos-macbar
 ```
 
-Before committing, run the secret scan:
-
-```bash
-bash scripts/check_secrets.sh
-```
-
-Package a Homebrew/GitHub release:
-
-```bash
-bash scripts/package_release.sh
-```
-
-Upload the generated `dist/Sonos-Macbar-0.1.0.zip` file to a GitHub release
-named `v0.1.0`. The Homebrew cask downloads that release asset.
-
-To publish a release through GitHub Actions:
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
+If installed manually, remove **Sonos Macbar.app** from `/Applications`.
 
 ## License
 
