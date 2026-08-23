@@ -3,6 +3,7 @@ import SwiftUI
 struct PlayerHeaderView: View {
     let player: SonosPlayer
     let connectionStatus: String
+    let language: AppLanguage
     let settingsAction: () -> Void
 
     var body: some View {
@@ -39,7 +40,7 @@ struct PlayerHeaderView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .accessibilityLabel("Einstellungen")
+            .accessibilityLabel(language.settingsTitle)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 6)
@@ -47,7 +48,7 @@ struct PlayerHeaderView: View {
 }
 
 #Preview {
-    PlayerHeaderView(player: .mockArc, connectionStatus: "Mock Mode") {}
+    PlayerHeaderView(player: .mockArc, connectionStatus: "Mock Mode", language: .english) {}
         .padding()
         .frame(width: 340)
 }

@@ -2,18 +2,23 @@ import SwiftUI
 
 struct ControlPanelView: View {
     @Bindable var state: SonosState
+    @AppStorage(AppLanguage.storageKey) private var appLanguageRawValue = AppLanguage.english.rawValue
     @State private var isShowingSettings = false
+
+    private var appLanguage: AppLanguage {
+        AppLanguage(rawValue: appLanguageRawValue) ?? .english
+    }
 
     var body: some View {
         Group {
             if isShowingSettings {
-                EmbeddedSettingsView(state: state) {
+                EmbeddedSettingsView(state: state, language: appLanguage, appLanguageRawValue: $appLanguageRawValue) {
                     isShowingSettings = false
                 }
             } else {
                 VStack(spacing: 10) {
                     if state.players.count > 1 {
-                        Picker("Room", selection: $state.selectedPlayerID) {
+                        Picker(appLanguage.room, selection: $state.selectedPlayerID) {
                             ForEach(state.players) { player in
                                 Text(player.roomName)
                                     .tag(Optional(player.id))
@@ -24,15 +29,19 @@ struct ControlPanelView: View {
                     }
 
                     if let player = state.selectedPlayer {
-                        PlayerHeaderView(player: player, connectionStatus: state.connectionStatus) {
+                        PlayerHeaderView(
+                            player: player,
+                            connectionStatus: state.connectionStatus(for: appLanguage),
+                            language: appLanguage
+                        ) {
                             isShowingSettings = true
                         }
 
-                        VolumeControlView(state: state, player: player)
+                        VolumeControlView(state: state, player: player, language: appLanguage)
 
-                        HomeTheaterControlsView(state: state, player: player)
+                        HomeTheaterControlsView(state: state, player: player, language: appLanguage)
                     } else if state.showsConnectionView {
-                        SonosConnectionView(state: state) {
+                        SonosConnectionView(state: state, language: appLanguage) {
                             isShowingSettings = true
                         }
                     } else {
@@ -40,7 +49,7 @@ struct ControlPanelView: View {
                             ProgressView()
                                 .frame(height: 180)
                         } else {
-                            ContentUnavailableView("Kein Raum", systemImage: "hifispeaker.2")
+                            ContentUnavailableView(appLanguage.noRoom, systemImage: "hifispeaker.2")
                                 .frame(height: 180)
                         }
                     }
@@ -65,6 +74,7 @@ struct ControlPanelView: View {
 
 private struct SonosConnectionView: View {
     @Bindable var state: SonosState
+    let language: AppLanguage
     let settingsAction: () -> Void
 
     var body: some View {
@@ -94,7 +104,7 @@ private struct SonosConnectionView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .accessibilityLabel("Einstellungen")
+                .accessibilityLabel(language.settingsTitle)
             }
 
             if showsProgress {
@@ -108,7 +118,7 @@ private struct SonosConnectionView: View {
                 Button {
                     state.reopenSonosLogin()
                 } label: {
-                    Label("Browser erneut öffnen", systemImage: "safari")
+                    Label(language.reopenBrowser, systemImage: "safari")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
@@ -117,7 +127,7 @@ private struct SonosConnectionView: View {
                 Button(role: .cancel) {
                     state.cancelSonosLogin()
                 } label: {
-                    Label("Abbrechen", systemImage: "xmark.circle")
+                    Label(language.cancel, systemImage: "xmark.circle")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderless)
@@ -126,7 +136,7 @@ private struct SonosConnectionView: View {
                 Button {
                     Task { await state.loadPlayers() }
                 } label: {
-                    Label("Erneut versuchen", systemImage: "arrow.clockwise")
+                    Label(language.retry, systemImage: "arrow.clockwise")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
@@ -139,7 +149,7 @@ private struct SonosConnectionView: View {
                 Button {
                     state.connectSonos()
                 } label: {
-                    Label("Mit Sonos verbinden", systemImage: "link")
+                    Label(language.connectToSonos, systemImage: "link")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
@@ -151,35 +161,11 @@ private struct SonosConnectionView: View {
     }
 
     private var title: String {
-        switch state.authState {
-        case .checking:
-            "Sonos-Verbindung prüfen"
-        case .notConfigured:
-            "Sonos-Anmeldung wird eingerichtet"
-        case .openingBrowser, .waitingForAuthorization:
-            "Anmeldung im Browser abschließen"
-        case .offline:
-            "Sonos ist gerade nicht erreichbar"
-        case .failed:
-            "Sonos konnte nicht verbunden werden"
-        default:
-            "Sonos ist nicht verbunden"
-        }
+        language.connectionTitle(for: state.authState)
     }
 
     private var message: String {
-        switch state.authState {
-        case .notConfigured:
-            "Die Sonos-Anmeldung ist serverseitig noch nicht verfügbar."
-        case .openingBrowser, .waitingForAuthorization:
-            "Melde dich bei Sonos an und erlaube den Zugriff."
-        case .offline:
-            "Die Verbindung wird automatisch erneut versucht."
-        case let .failed(message):
-            message
-        default:
-            "Verbinde dein Sonos-Konto, um Räume und Wiedergabe zu steuern."
-        }
+        language.connectionMessage(for: state.authState)
     }
 
     private var iconName: String {
@@ -205,6 +191,8 @@ private struct SonosConnectionView: View {
 
 private struct EmbeddedSettingsView: View {
     @Bindable var state: SonosState
+    let language: AppLanguage
+    @Binding var appLanguageRawValue: String
     let closeAction: () -> Void
 
     @State private var snapshot: SonosAccountSnapshot?
@@ -213,7 +201,7 @@ private struct EmbeddedSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Einstellungen")
+                Text(language.settingsTitle)
                     .font(.headline)
 
                 Spacer()
@@ -225,15 +213,16 @@ private struct EmbeddedSettingsView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .accessibilityLabel("Schliessen")
+                .accessibilityLabel(language.close)
             }
 
             VStack(spacing: 9) {
-                SettingsInfoRow(title: "Status", value: snapshot?.connectionStatus ?? state.connectionStatus)
-                SettingsInfoRow(title: "Anmeldung", value: snapshot?.authStatus ?? state.authState.userMessage)
+                SettingsInfoRow(title: language.status, value: snapshot?.connectionStatus ?? state.connectionStatus(for: language))
+                SettingsInfoRow(title: language.login, value: snapshot?.authStatus ?? state.authState.userMessage(for: language))
                 roomPicker
-                SettingsInfoRow(title: "Sitzung", value: snapshot?.hasBrokerSession == true ? "Gespeichert" : "Nicht gespeichert")
-                SettingsInfoRow(title: "Token", value: snapshot?.hasAccessToken == true ? "Gespeichert" : "Nicht gespeichert")
+                SettingsInfoRow(title: language.session, value: snapshot?.hasBrokerSession == true ? language.stored : language.notStored)
+                SettingsInfoRow(title: language.token, value: snapshot?.hasAccessToken == true ? language.stored : language.notStored)
+                languagePicker
             }
             .padding(.vertical, 2)
 
@@ -246,7 +235,7 @@ private struct EmbeddedSettingsView: View {
                         await refreshSnapshot()
                     }
                 } label: {
-                    Label(state.isLoading ? "Lädt" : "Räume neu laden", systemImage: "arrow.clockwise")
+                    Label(state.isLoading ? language.loading : language.reloadRooms, systemImage: "arrow.clockwise")
                         .frame(maxWidth: .infinity)
                 }
                 .disabled(state.isLoading)
@@ -255,19 +244,19 @@ private struct EmbeddedSettingsView: View {
                     Button {
                         state.connectSonos()
                     } label: {
-                        Label("Sonos verbinden", systemImage: "link")
+                        Label(language.connectSonos, systemImage: "link")
                             .frame(maxWidth: .infinity)
                     }
                 }
 
                 if isConfirmingDisconnect {
                     HStack(spacing: 8) {
-                        Button("Abbrechen") {
+                        Button(language.cancel) {
                             isConfirmingDisconnect = false
                         }
                         .frame(maxWidth: .infinity)
 
-                        Button("Trennen", role: .destructive) {
+                        Button(language.disconnect, role: .destructive) {
                             Task {
                                 await state.disconnectSonos()
                                 isConfirmingDisconnect = false
@@ -280,7 +269,7 @@ private struct EmbeddedSettingsView: View {
                     Button(role: .destructive) {
                         isConfirmingDisconnect = true
                     } label: {
-                        Label("Verbindung trennen", systemImage: "rectangle.portrait.and.arrow.right")
+                        Label(language.disconnectConnection, systemImage: "rectangle.portrait.and.arrow.right")
                             .frame(maxWidth: .infinity)
                     }
                 }
@@ -292,18 +281,23 @@ private struct EmbeddedSettingsView: View {
         .task {
             await refreshSnapshot()
         }
+        .onChange(of: appLanguageRawValue) {
+            Task {
+                await refreshSnapshot()
+            }
+        }
     }
 
     @ViewBuilder
     private var roomPicker: some View {
         if state.players.isEmpty {
-            SettingsInfoRow(title: "Raum", value: "Keiner")
+            SettingsInfoRow(title: language.room, value: language.none)
         } else {
             HStack(spacing: 12) {
-                Text("Raum")
+                Text(language.room)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Picker("Raum", selection: $state.selectedPlayerID) {
+                Picker(language.room, selection: $state.selectedPlayerID) {
                     ForEach(state.players) { player in
                         Text(player.roomName)
                             .tag(Optional(player.id))
@@ -317,8 +311,26 @@ private struct EmbeddedSettingsView: View {
         }
     }
 
+    private var languagePicker: some View {
+        HStack(spacing: 12) {
+            Text(language.language)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Picker(language.language, selection: $appLanguageRawValue) {
+                ForEach(AppLanguage.allCases) { language in
+                    Text(language.displayName)
+                        .tag(language.rawValue)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(maxWidth: 190, alignment: .trailing)
+        }
+        .font(.callout)
+    }
+
     private func refreshSnapshot() async {
-        snapshot = await state.accountSnapshot()
+        snapshot = await state.accountSnapshot(language: language)
     }
 }
 

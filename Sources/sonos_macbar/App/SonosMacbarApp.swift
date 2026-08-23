@@ -67,7 +67,7 @@ private final class StatusBarController: NSObject {
         let menu = NSMenu()
         menu.addItem(
             NSMenuItem(
-                title: "Quit Sonos Macbar",
+                title: AppLanguage.english.quitApp,
                 action: #selector(quitApp),
                 keyEquivalent: "q"
             )
@@ -111,6 +111,7 @@ private final class StatusBarController: NSObject {
         guard let statusItem, let contextMenu else { return }
 
         popover?.performClose(nil)
+        contextMenu.items.first?.title = AppLanguage.current.quitApp
         statusItem.menu = contextMenu
         button.performClick(nil)
         statusItem.menu = nil

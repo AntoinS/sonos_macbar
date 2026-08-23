@@ -33,11 +33,12 @@ final class SonosState {
         return players.first { $0.id == selectedPlayerID }
     }
 
-    var connectionStatus: String {
-        if isLoading { return "Verbinden" }
-        if isAuthenticationRequired { return "Nicht verbunden" }
-        if errorMessage != nil { return "Offline" }
-        return "Verbunden"
+    func connectionStatus(for language: AppLanguage) -> String {
+        language.connectionStatus(
+            isLoading: isLoading,
+            isAuthenticationRequired: isAuthenticationRequired,
+            hasError: errorMessage != nil
+        )
     }
 
     var canConnectSonos: Bool {
@@ -178,10 +179,10 @@ final class SonosState {
         }
     }
 
-    func accountSnapshot() async -> SonosAccountSnapshot {
+    func accountSnapshot(language: AppLanguage) async -> SonosAccountSnapshot {
         SonosAccountSnapshot(
-            connectionStatus: connectionStatus,
-            authStatus: authState.userMessage,
+            connectionStatus: connectionStatus(for: language),
+            authStatus: authState.userMessage(for: language),
             selectedRoomName: selectedPlayer?.roomName,
             hasBrokerSession: await tokenStore.brokerSessionId() != nil,
             hasAccessToken: await tokenStore.savedAccessToken() != nil

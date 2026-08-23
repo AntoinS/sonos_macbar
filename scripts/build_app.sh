@@ -13,6 +13,7 @@ APP_DIR="${DIST_DIR}/${APP_NAME}.app"
 CONTENTS_DIR="${APP_DIR}/Contents"
 MACOS_DIR="${CONTENTS_DIR}/MacOS"
 RESOURCES_DIR="${CONTENTS_DIR}/Resources"
+SOURCE_ICON="Resources/AppIcon/Icon Exports/Icon-iOS-Default-1024x1024@1x.png"
 APP_ICON="AppIcon.icns"
 
 cd "$(dirname "$0")/.."
@@ -20,7 +21,7 @@ cd "$(dirname "$0")/.."
 export CLANG_MODULE_CACHE_PATH="${CLANG_MODULE_CACHE_PATH:-${TMPDIR:-/tmp}/sonos_macbar-clang-cache}"
 export SWIFT_MODULE_CACHE_PATH="${SWIFT_MODULE_CACHE_PATH:-${TMPDIR:-/tmp}/sonos_macbar-swift-cache}"
 
-if [[ ! -f "Resources/${APP_ICON}" || "Resources/AppIconSource.png" -nt "Resources/${APP_ICON}" ]]; then
+if [[ ! -f "Resources/${APP_ICON}" || "${SOURCE_ICON}" -nt "Resources/${APP_ICON}" ]]; then
     bash scripts/generate_app_icon.sh
 fi
 

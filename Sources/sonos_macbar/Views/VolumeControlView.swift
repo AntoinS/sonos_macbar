@@ -3,6 +3,7 @@ import SwiftUI
 struct VolumeControlView: View {
     let state: SonosState
     let player: SonosPlayer
+    let language: AppLanguage
 
     @State private var draftVolume: Double = 35
     @State private var isEditing = false
@@ -20,7 +21,7 @@ struct VolumeControlView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(player.muted ? "Ton einschalten" : "Stummschalten")
+            .accessibilityLabel(player.muted ? language.unmute : language.mute)
 
             GeometryReader { proxy in
                 let width = max(proxy.size.width, 1)
@@ -64,7 +65,7 @@ struct VolumeControlView: View {
             }
             .frame(height: 28)
 
-            Text(player.muted ? "Aus" : "\(Int(draftVolume.rounded()))")
+            Text(player.muted ? language.off : "\(Int(draftVolume.rounded()))")
                 .font(.system(.callout, design: .rounded).monospacedDigit().weight(.medium))
                 .foregroundStyle(.secondary)
                 .frame(width: 34, alignment: .trailing)
@@ -72,8 +73,8 @@ struct VolumeControlView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Volume")
-        .accessibilityValue(player.muted ? "Muted" : "\(Int(draftVolume.rounded())) percent")
+        .accessibilityLabel(language.volume)
+        .accessibilityValue(language.volumeValue(isMuted: player.muted, volume: Int(draftVolume.rounded())))
         .onAppear {
             draftVolume = Double(player.volume)
         }
@@ -109,7 +110,7 @@ struct VolumeControlView: View {
 }
 
 #Preview {
-    VolumeControlView(state: SonosState(service: MockSonosService()), player: .mockArc)
+    VolumeControlView(state: SonosState(service: MockSonosService()), player: .mockArc, language: .english)
         .padding()
         .frame(width: 340)
 }

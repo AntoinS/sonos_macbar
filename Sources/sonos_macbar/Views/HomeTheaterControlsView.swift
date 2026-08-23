@@ -3,14 +3,16 @@ import SwiftUI
 struct HomeTheaterControlsView: View {
     let state: SonosState
     let player: SonosPlayer
+    let language: AppLanguage
 
     var body: some View {
         HStack(spacing: 8) {
             if player.supportsEnhanceDialog {
                 ControlCenterToggleButton(
-                    title: "Voice",
+                    title: language.voice,
                     systemImage: "text.bubble.fill",
-                    isOn: player.enhanceDialog
+                    isOn: player.enhanceDialog,
+                    language: language
                 ) {
                     Task { await state.setEnhanceDialog(!player.enhanceDialog) }
                 }
@@ -18,9 +20,10 @@ struct HomeTheaterControlsView: View {
 
             if player.supportsNightMode {
                 ControlCenterToggleButton(
-                    title: "Night",
+                    title: language.night,
                     systemImage: "moon.fill",
-                    isOn: player.nightMode
+                    isOn: player.nightMode,
+                    language: language
                 ) {
                     Task { await state.setNightMode(!player.nightMode) }
                 }
@@ -33,6 +36,7 @@ private struct ControlCenterToggleButton: View {
     let title: String
     let systemImage: String
     let isOn: Bool
+    let language: AppLanguage
     let action: () -> Void
 
     var body: some View {
@@ -63,12 +67,12 @@ private struct ControlCenterToggleButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
-        .accessibilityValue(isOn ? "On" : "Off")
+        .accessibilityValue(isOn ? language.on : language.off)
     }
 }
 
 #Preview {
-    HomeTheaterControlsView(state: SonosState(service: MockSonosService()), player: .mockArc)
+    HomeTheaterControlsView(state: SonosState(service: MockSonosService()), player: .mockArc, language: .english)
         .padding()
         .frame(width: 340)
 }
