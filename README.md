@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="Resources/AppIcon/Icon%20Exports/Icon-iOS-Default-1024x1024@1x.png" alt="Sonos Macbar icon" width="180" />
+  <img src="Resources/AppIcon/Icon%20Exports/Icon-iOS-ClearDark-1024x1024@1x_clear.png" alt="Sonos Macbar icon" width="180" />
 
   <h1>Sonos Macbar</h1>
 
