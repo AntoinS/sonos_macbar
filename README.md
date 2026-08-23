@@ -55,9 +55,14 @@ macOS Keychain.
 Install with Homebrew:
 
 ```bash
-brew tap AntoinS/sonos_macbar
-brew install --cask sonos-macbar
+brew tap AntoinS/sonos_macbar \
+  https://github.com/AntoinS/sonos_macbar.git
+brew install --cask --no-quarantine antoins/sonos_macbar/sonos-macbar
 ```
+
+The `--no-quarantine` option is a free workaround for testing unsigned builds
+and bypasses macOS Gatekeeper's quarantine check. A Developer ID signature and
+Apple notarization are required for a warning-free public release.
 
 Or build the app manually:
 
