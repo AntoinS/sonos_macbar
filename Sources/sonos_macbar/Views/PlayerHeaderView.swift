@@ -4,6 +4,7 @@ struct PlayerHeaderView: View {
     let player: SonosPlayer
     let connectionStatus: String
     let language: AppLanguage
+    let equalizerAction: () -> Void
     let settingsAction: () -> Void
 
     var body: some View {
@@ -47,21 +48,31 @@ struct PlayerHeaderView: View {
                 .padding(.vertical, 4)
                 .background(Color(nsColor: .quaternaryLabelColor).opacity(0.16), in: Capsule())
 
-            Button(action: settingsAction) {
-                Image(systemName: "gearshape")
-                    .frame(width: 22, height: 22)
+            HStack(spacing: 2) {
+                headerButton("Equalizer", icon: "slider.horizontal.3", action: equalizerAction)
+                headerButton(language.settingsTitle, icon: "gearshape", action: settingsAction)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-            .accessibilityLabel(language.settingsTitle)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 6)
     }
+
+    private func headerButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .medium))
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .accessibilityLabel(title)
+        .help(title)
+    }
 }
 
 #Preview {
-    PlayerHeaderView(player: .mockArc, connectionStatus: "Mock Mode", language: .english) {}
+    PlayerHeaderView(player: .mockArc, connectionStatus: "Mock Mode", language: .english, equalizerAction: {}) {}
         .padding()
         .frame(width: 340)
 }

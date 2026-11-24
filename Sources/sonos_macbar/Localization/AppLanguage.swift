@@ -97,49 +97,8 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         }
     }
 
-    var none: String {
-        switch self {
-        case .english:
-            "None"
-        case .german:
-            "Keiner"
-        }
-    }
-
-    var status: String {
-        switch self {
-        case .english:
-            "Status"
-        case .german:
-            "Status"
-        }
-    }
-
-    var login: String {
-        switch self {
-        case .english:
-            "Login"
-        case .german:
-            "Anmeldung"
-        }
-    }
-
-    var session: String {
-        switch self {
-        case .english:
-            "Session"
-        case .german:
-            "Sitzung"
-        }
-    }
-
-    var token: String {
-        switch self {
-        case .english:
-            "Token"
-        case .german:
-            "Token"
-        }
+    var notConnected: String {
+        isGerman ? "Nicht verbunden" : "Not connected"
     }
 
     var language: String {
@@ -151,22 +110,8 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         }
     }
 
-    var stored: String {
-        switch self {
-        case .english:
-            "Stored"
-        case .german:
-            "Gespeichert"
-        }
-    }
-
-    var notStored: String {
-        switch self {
-        case .english:
-            "Not stored"
-        case .german:
-            "Nicht gespeichert"
-        }
+    var browserLogin: String {
+        isGerman ? "Anmeldung im Browser" : "Sign in via browser"
     }
 
     var loading: String {
@@ -221,6 +166,10 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .german:
             "Verbindung trennen"
         }
+    }
+
+    var disconnectSonosQuestion: String {
+        isGerman ? "Sonos trennen?" : "Disconnect Sonos?"
     }
 
     var cancel: String {
@@ -346,12 +295,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         }
 
         if isAuthenticationRequired {
-            switch self {
-            case .english:
-                return "Not Connected"
-            case .german:
-                return "Nicht verbunden"
-            }
+            return notConnected
         }
 
         if hasError {

@@ -16,10 +16,12 @@ struct EqualizerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            PanelHeader(title: "Equalizer", closeLabel: language.close, onClose: onClose)
-            Text(player.roomName)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 4) {
+                PanelHeader(title: "Equalizer", closeLabel: language.close, onClose: onClose)
+                Text(player.roomName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Divider()
             content
         }
@@ -45,16 +47,24 @@ struct EqualizerView: View {
             }
         case .ready:
             VStack(alignment: .leading, spacing: 6) {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     slider(.bass)
                     slider(.treble)
                     slider(.subLevel)
                     if let loudness = state.values[.loudness] {
-                        Toggle(language.equalizerLabel(.loudness), isOn: Binding(
-                            get: { loudness == 1 },
-                            set: { save(.loudness, value: $0 ? 1 : 0) }
-                        ))
-                        .toggleStyle(.switch)
+                        let title = language.equalizerLabel(.loudness)
+                        HStack {
+                            Text(title)
+                                .foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
+                            Spacer()
+                            Toggle(title, isOn: Binding(
+                                get: { loudness == 1 },
+                                set: { save(.loudness, value: $0 ? 1 : 0) }
+                            ))
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                        }
                     }
                 }
                 .disabled(state.isSaving)

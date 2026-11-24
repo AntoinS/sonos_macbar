@@ -17,9 +17,19 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Package app
+        env:
+          SONOS_MACBAR_SPARKLE_PUBLIC_KEY: ${{ vars.SPARKLE_PUBLIC_KEY }}
         run: |
+          : "${SONOS_MACBAR_SPARKLE_PUBLIC_KEY:?Set the SPARKLE_PUBLIC_KEY repository variable.}"
           VERSION="${GITHUB_REF_NAME#v}"
           SONOS_MACBAR_VERSION="$VERSION" bash scripts/package_release.sh
+
+      - name: Sign update feed
+        env:
+          SONOS_MACBAR_SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          SONOS_MACBAR_VERSION="$VERSION" bash scripts/generate_update_feed.sh
 
       - name: Create GitHub release
         env:
@@ -31,7 +41,7 @@ jobs:
           git fetch --no-tags origin "+$TAG_REF:$TAG_REF"
           test "$(git rev-parse "$TAG_REF^{commit}")" = "$(git rev-parse HEAD)"
           git for-each-ref --format='%(contents)' "$TAG_REF" |
-          gh release create "$GITHUB_REF_NAME" "$ARCHIVE_PATH" \
+          gh release create "$GITHUB_REF_NAME" "$ARCHIVE_PATH" dist/appcast.xml \
             --title "Sonos Macbar ${VERSION}" \
             --verify-tag \
             --notes-file -

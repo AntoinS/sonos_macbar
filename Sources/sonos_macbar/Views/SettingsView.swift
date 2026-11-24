@@ -1,0 +1,213 @@
+import SwiftUI
+
+struct SettingsView: View {
+    @Bindable var state: SonosState
+    let language: AppLanguage
+    @Binding var appLanguageRawValue: String
+    let closeAction: () -> Void
+
+    @State private var isConfirmingDisconnect = false
+    @State private var isDisconnecting = false
+
+    var body: some View {
+        VStack(spacing: 10) {
+            PanelHeader(title: language.settingsTitle, closeLabel: language.close, onClose: closeAction)
+
+            VStack(spacing: 0) {
+                connectionRow
+                    .padding(10)
+
+                if !state.players.isEmpty || (isConnected && !state.isLoading) {
+                    rowDivider
+                    roomRow.padding(10)
+                }
+
+                if isConfirmingDisconnect && canDisconnect {
+                    rowDivider
+                    disconnectConfirmation.padding(10)
+                }
+            }
+            .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
+
+            VStack(spacing: 0) {
+                languageRow.padding(10)
+                rowDivider
+                AppUpdateView(language: language).padding(10)
+            }
+            .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    private var connectionRow: some View {
+        HStack(spacing: 8) {
+            SettingsIcon("hifispeaker.2.fill", tint: .blue)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Sonos")
+                    .font(.callout.weight(.semibold))
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(isConnected && !state.isLoading && state.errorMessage == nil ? Color.green : Color.secondary)
+                        .frame(width: 5, height: 5)
+                        .accessibilityHidden(true)
+                    Text(connectionLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .help(state.errorMessage ?? state.authState.userMessage(for: language))
+                }
+            }
+
+            Spacer(minLength: 4)
+
+            if isDisconnecting || (state.isLoading && canDisconnect) {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(width: 24)
+                    .accessibilityLabel(language.loading)
+            } else if state.authState == .openingBrowser || state.authState == .waitingForAuthorization {
+                iconButton(language.reopenBrowser, symbol: "safari", action: state.reopenSonosLogin)
+                iconButton(language.cancel, symbol: "xmark", action: state.cancelSonosLogin)
+            } else {
+                if state.canConnectSonos {
+                    if canDisconnect {
+                        iconButton(language.connectSonos, symbol: "link", action: state.connectSonos)
+                    } else {
+                        Button(action: state.connectSonos) {
+                            Label(language.connectSonos, systemImage: "link")
+                        }
+                    }
+                } else if canDisconnect {
+                    iconButton(language.reloadRooms, symbol: "arrow.clockwise") {
+                        Task { await state.reloadPlayers() }
+                    }
+                }
+                if canDisconnect {
+                    iconButton(language.disconnectConnection, symbol: "rectangle.portrait.and.arrow.right") {
+                        isConfirmingDisconnect.toggle()
+                    }
+                }
+            }
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+    }
+
+    private var roomRow: some View {
+        HStack(spacing: 8) {
+            SettingsIcon("house.fill", tint: .secondary)
+            Text(language.room)
+            Spacer()
+
+            if state.players.isEmpty {
+                Text(language.noRoom)
+                    .foregroundStyle(.secondary)
+            } else {
+                Picker(language.room, selection: $state.selectedPlayerID) {
+                    ForEach(state.players) { player in
+                        Text(player.roomName).tag(Optional(player.id))
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(maxWidth: 175, alignment: .trailing)
+            }
+        }
+        .font(.callout)
+        .controlSize(.small)
+    }
+
+    private var languageRow: some View {
+        HStack(spacing: 8) {
+            SettingsIcon("globe", tint: .indigo)
+            Text(language.language)
+            Spacer()
+            Picker(language.language, selection: $appLanguageRawValue) {
+                ForEach(AppLanguage.allCases) { option in
+                    Text(option.displayName).tag(option.rawValue)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
+        }
+        .font(.callout)
+        .controlSize(.small)
+    }
+
+    private var disconnectConfirmation: some View {
+        HStack(spacing: 8) {
+            Text(language.disconnectSonosQuestion)
+            Spacer()
+            Button(language.cancel) {
+                isConfirmingDisconnect = false
+            }
+            Button(language.disconnect, role: .destructive) {
+                isConfirmingDisconnect = false
+                isDisconnecting = true
+                Task {
+                    await state.disconnectSonos()
+                    isDisconnecting = false
+                }
+            }
+        }
+        .font(.callout)
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+    }
+
+    private var isConnected: Bool {
+        state.authState == .connected && !state.isAuthenticationRequired
+    }
+
+    private var canDisconnect: Bool {
+        isConnected || !state.players.isEmpty
+    }
+
+    private var connectionLabel: String {
+        switch state.authState {
+        case .connected:
+            state.connectionStatus(for: language)
+        case .disconnected:
+            language.notConnected
+        case .checking, .refreshing:
+            language.loading
+        case .openingBrowser, .waitingForAuthorization:
+            language.browserLogin
+        case .offline:
+            "Offline"
+        case .notConfigured, .failed:
+            language.connectionTitle(for: state.authState)
+        }
+    }
+
+    private var rowDivider: some View {
+        Divider().padding(.horizontal, 10)
+    }
+
+    private func iconButton(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: symbol)
+                .labelStyle(.iconOnly)
+                .frame(minWidth: 16)
+        }
+        .help(title)
+    }
+}
+
+struct SettingsIcon: View {
+    let symbol: String
+    let tint: Color
+
+    init(_ symbol: String, tint: Color) {
+        self.symbol = symbol
+        self.tint = tint
+    }
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(tint)
+            .frame(width: 28, height: 28)
+            .background(tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 7))
+            .accessibilityHidden(true)
+    }
+}

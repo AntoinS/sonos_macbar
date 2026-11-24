@@ -38,7 +38,7 @@
 ## Screenshots
 
 <div align="center">
-  <img src="assets/screenshots/control-panel.png" width="350" align="top" alt="Sonos Macbar control panel with a dedicated Equalizer button" />
+  <img src="assets/screenshots/control-panel.png" width="350" align="top" alt="Sonos Macbar control panel with the Equalizer icon next to Settings" />
   &nbsp;&nbsp;
   <img src="assets/screenshots/equalizer.png" width="350" align="top" alt="Equalizer view with bass, treble, Sub level and loudness controls" />
 </div>
@@ -46,7 +46,7 @@
 <div align="center">
   <img src="assets/screenshots/connect.png" width="350" align="top" alt="Sonos Macbar connect screen" />
   &nbsp;&nbsp;
-  <img src="assets/screenshots/settings.png" width="350" align="top" alt="Sonos Macbar settings with a GitHub update check" />
+  <img src="assets/screenshots/settings.png" width="350" align="top" alt="Compact Sonos Macbar settings with connection, room, language and update controls" />
 </div>
 
 ## How it works
@@ -59,9 +59,9 @@
 No tokens need to be copied or pasted. The app keeps the connection in the
 macOS Keychain.
 
-Select **Equalizer** in the control panel to open a separate view for the
-selected room. Bass, treble and Sub level use the same slider design as the
-volume control. Select **×** to return to the control panel.
+Select the **Equalizer** icon next to Settings to open the EQ for the selected
+room. Bass, treble and Sub level use the same slider design as the volume
+control. Select **×** to return to the control panel.
 
 Your Mac and Sonos speaker must be on the same local network. If prompted,
 allow local network access under **System Settings → Privacy & Security →
@@ -70,6 +70,9 @@ Local Network**.
 ## Install
 
 The prebuilt release requires an Apple silicon Mac with macOS 14 or later.
+
+Download the Sonos Macbar ZIP from [GitHub Releases](https://github.com/AntoinS/sonos_macbar/releases/latest),
+then move the extracted app to Applications.
 
 Install with Homebrew:
 
@@ -114,10 +117,13 @@ does not open a normal Dock window.
 
 ### Updates
 
-Open **Settings → Updates → Check for Updates** to check the latest stable
-GitHub release. **Update with Homebrew** runs the upgrade in Terminal. If you
-installed the app manually, download the ZIP, quit Sonos Macbar and replace
-the app in Applications.
+Open **Settings → Updates** and select **Update**. The app downloads and verifies
+the signed GitHub release, shows its progress, then installs the update and
+reopens Sonos Macbar.
+
+If you’re using version 0.2.1 or older, install the latest GitHub ZIP once to
+switch to the in-app updater. Quit Sonos Macbar before replacing the app in
+Applications.
 
 See [GitHub Releases](https://github.com/AntoinS/sonos_macbar/releases) for
 patch notes and downloads.

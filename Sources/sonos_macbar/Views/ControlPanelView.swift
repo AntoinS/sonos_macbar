@@ -16,7 +16,7 @@ struct ControlPanelView: View {
     var body: some View {
         Group {
             if page == .settings {
-                EmbeddedSettingsView(state: state, language: appLanguage, appLanguageRawValue: $appLanguageRawValue) {
+                SettingsView(state: state, language: appLanguage, appLanguageRawValue: $appLanguageRawValue) {
                     page = .controls
                 }
             } else if page == .equalizer, let player = state.selectedPlayer {
@@ -41,7 +41,8 @@ struct ControlPanelView: View {
                         PlayerHeaderView(
                             player: player,
                             connectionStatus: state.connectionStatus(for: appLanguage),
-                            language: appLanguage
+                            language: appLanguage,
+                            equalizerAction: { page = .equalizer }
                         ) {
                             page = .settings
                         }
@@ -49,20 +50,6 @@ struct ControlPanelView: View {
                         VolumeControlView(state: state, player: player, language: appLanguage)
 
                         HomeTheaterControlsView(state: state, player: player, language: appLanguage)
-
-                        Button {
-                            page = .equalizer
-                        } label: {
-                            HStack {
-                                Label("Equalizer", systemImage: "slider.horizontal.3")
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
                     } else if state.showsConnectionView {
                         SonosConnectionView(state: state, language: appLanguage) {
                             page = .settings
@@ -218,141 +205,6 @@ private struct SonosConnectionView: View {
     }
 }
 
-private struct EmbeddedSettingsView: View {
-    @Bindable var state: SonosState
-    let language: AppLanguage
-    @Binding var appLanguageRawValue: String
-    let closeAction: () -> Void
-
-    @State private var snapshot: SonosAccountSnapshot?
-    @State private var isConfirmingDisconnect = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            PanelHeader(title: language.settingsTitle, closeLabel: language.close, onClose: closeAction)
-
-            VStack(spacing: 9) {
-                SettingsInfoRow(title: language.status, value: snapshot?.connectionStatus ?? state.connectionStatus(for: language))
-                SettingsInfoRow(title: language.login, value: snapshot?.authStatus ?? state.authState.userMessage(for: language))
-                roomPicker
-                SettingsInfoRow(title: language.session, value: snapshot?.hasBrokerSession == true ? language.stored : language.notStored)
-                SettingsInfoRow(title: language.token, value: snapshot?.hasAccessToken == true ? language.stored : language.notStored)
-                languagePicker
-            }
-            .padding(.vertical, 2)
-
-            Divider()
-
-            VStack(spacing: 8) {
-                Button {
-                    Task {
-                        await state.reloadPlayers()
-                        await refreshSnapshot()
-                    }
-                } label: {
-                    Label(state.isLoading ? language.loading : language.reloadRooms, systemImage: "arrow.clockwise")
-                        .frame(maxWidth: .infinity)
-                }
-                .disabled(state.isLoading)
-
-                if state.canConnectSonos {
-                    Button {
-                        state.connectSonos()
-                    } label: {
-                        Label(language.connectSonos, systemImage: "link")
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-
-                if isConfirmingDisconnect {
-                    HStack(spacing: 8) {
-                        Button(language.cancel) {
-                            isConfirmingDisconnect = false
-                        }
-                        .frame(maxWidth: .infinity)
-
-                        Button(language.disconnect, role: .destructive) {
-                            Task {
-                                await state.disconnectSonos()
-                                isConfirmingDisconnect = false
-                                await refreshSnapshot()
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                } else if snapshot?.hasAccessToken == true || snapshot?.hasBrokerSession == true || !state.players.isEmpty {
-                    Button(role: .destructive) {
-                        isConfirmingDisconnect = true
-                    } label: {
-                        Label(language.disconnectConnection, systemImage: "rectangle.portrait.and.arrow.right")
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
-
-            Divider()
-
-            AppUpdateView(language: language)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .task {
-            await refreshSnapshot()
-        }
-        .onChange(of: appLanguageRawValue) {
-            Task {
-                await refreshSnapshot()
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var roomPicker: some View {
-        if state.players.isEmpty {
-            SettingsInfoRow(title: language.room, value: language.none)
-        } else {
-            HStack(spacing: 12) {
-                Text(language.room)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Picker(language.room, selection: $state.selectedPlayerID) {
-                    ForEach(state.players) { player in
-                        Text(player.roomName)
-                            .tag(Optional(player.id))
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .frame(maxWidth: 190, alignment: .trailing)
-            }
-            .font(.callout)
-        }
-    }
-
-    private var languagePicker: some View {
-        HStack(spacing: 12) {
-            Text(language.language)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Picker(language.language, selection: $appLanguageRawValue) {
-                ForEach(AppLanguage.allCases) { language in
-                    Text(language.displayName)
-                        .tag(language.rawValue)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .frame(maxWidth: 190, alignment: .trailing)
-        }
-        .font(.callout)
-    }
-
-    private func refreshSnapshot() async {
-        snapshot = await state.accountSnapshot(language: language)
-    }
-}
-
 struct PanelHeader: View {
     let title: String
     let closeLabel: String
@@ -372,22 +224,6 @@ struct PanelHeader: View {
             .foregroundStyle(.secondary)
             .accessibilityLabel(closeLabel)
         }
-    }
-}
-
-private struct SettingsInfoRow: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Text(title)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .lineLimit(1)
-        }
-        .font(.callout)
     }
 }
 

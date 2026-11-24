@@ -14,12 +14,16 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/CreatureSurvive/UPnPCast.git", exact: "1.0.0")
+        .package(url: "https://github.com/CreatureSurvive/UPnPCast.git", exact: "1.0.0"),
+        .package(url: "https://github.com/sparkle-project/Sparkle.git", exact: "2.10.1")
     ],
     targets: [
         .executableTarget(
             name: "sonos_macbar",
-            dependencies: [.product(name: "UPnPCast", package: "UPnPCast")],
+            dependencies: [
+                .product(name: "UPnPCast", package: "UPnPCast"),
+                .product(name: "Sparkle", package: "Sparkle")
+            ],
             path: "Sources/sonos_macbar"
         ),
         .testTarget(

@@ -45,7 +45,9 @@ final class SonosState {
         switch authState {
         case .disconnected, .failed, .offline, .notConfigured:
             true
-        case .checking, .openingBrowser, .waitingForAuthorization, .connected, .refreshing:
+        case .connected:
+            isAuthenticationRequired
+        case .checking, .openingBrowser, .waitingForAuthorization, .refreshing:
             false
         }
     }
@@ -196,18 +198,6 @@ final class SonosState {
         }
     }
 
-    func accountSnapshot(language: AppLanguage) async -> SonosAccountSnapshot {
-        let isConnected = authState == .connected && !isAuthenticationRequired
-
-        return SonosAccountSnapshot(
-            connectionStatus: connectionStatus(for: language),
-            authStatus: authState.userMessage(for: language),
-            selectedRoomName: selectedPlayer?.roomName,
-            hasBrokerSession: isConnected,
-            hasAccessToken: isConnected
-        )
-    }
-
     func setMuted(_ isMuted: Bool) async {
         guard let player = selectedPlayer else { return }
 
@@ -293,12 +283,4 @@ final class SonosState {
 
         return (error as? URLError)?.code == .cancelled
     }
-}
-
-struct SonosAccountSnapshot: Equatable {
-    let connectionStatus: String
-    let authStatus: String
-    let selectedRoomName: String?
-    let hasBrokerSession: Bool
-    let hasAccessToken: Bool
 }
