@@ -4,7 +4,7 @@ import Sparkle
 
 @MainActor
 @Observable
-final class AppUpdater: NSObject, SPUUserDriver {
+final class AppUpdater: NSObject, SPUUserDriver, SPUUpdaterDelegate {
     static let shared = AppUpdater()
 
     enum Status {
@@ -15,6 +15,7 @@ final class AppUpdater: NSObject, SPUUserDriver {
     }
 
     private(set) var status: Status = .idle
+    private(set) var availableVersion: String?
     @ObservationIgnored private var updater: SPUUpdater?
     @ObservationIgnored private var received: UInt64 = 0
     @ObservationIgnored private var expected: UInt64 = 0
@@ -29,25 +30,57 @@ final class AppUpdater: NSObject, SPUUserDriver {
         return decoded.count == 32 && Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") != nil
     }
 
-    func checkForUpdates() {
-        guard isConfigured else { return }
-        if updater == nil {
-            let engine = SPUUpdater(hostBundle: .main, applicationBundle: .main, userDriver: self, delegate: nil)
-            do {
-                try engine.start()
-                updater = engine
-            } catch {
-                status = .failed(error.localizedDescription)
-                return
+    func start() {
+        guard isConfigured, updater == nil else { return }
+        let engine = SPUUpdater(hostBundle: .main, applicationBundle: .main, userDriver: self, delegate: self)
+        do {
+            try engine.start()
+            updater = engine
+            if engine.automaticallyChecksForUpdates {
+                engine.checkForUpdatesInBackground()
             }
+        } catch {
+            status = .failed(error.localizedDescription)
         }
-        guard let updater, updater.canCheckForUpdates else { return }
+    }
+
+    func performUpdateAction() {
+        start()
+        guard let updater else { return }
         status = .checking
-        updater.checkForUpdates()
+
+        // An active background check can provide the result without starting a second check.
+        guard updater.canCheckForUpdates else { return }
+        if availableVersion == nil {
+            updater.checkForUpdateInformation()
+        } else {
+            updater.checkForUpdates()
+        }
+    }
+
+    func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        availableVersion = item.isInformationOnlyUpdate ? nil : item.displayVersionString
+        if case .failed = status {
+            status = .idle
+        }
+    }
+
+    func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
+        availableVersion = nil
+        status = .current
+    }
+
+    func updater(_ updater: SPUUpdater, didFinishUpdateCycleFor updateCheck: SPUUpdateCheck, error: (any Error)?) {
+        guard case .checking = status else { return }
+        if let error {
+            status = .failed(error.localizedDescription)
+        } else {
+            status = .idle
+        }
     }
 
     func show(_ request: SPUUpdatePermissionRequest) async -> SUUpdatePermissionResponse {
-        SUUpdatePermissionResponse(automaticUpdateChecks: false, sendSystemProfile: false)
+        SUUpdatePermissionResponse(automaticUpdateChecks: true, sendSystemProfile: false)
     }
 
     func showUserInitiatedUpdateCheck(cancellation: @escaping () -> Void) {
@@ -55,10 +88,7 @@ final class AppUpdater: NSObject, SPUUserDriver {
     }
 
     func showUpdateFound(with appcastItem: SUAppcastItem, state: SPUUserUpdateState) async -> SPUUserUpdateChoice {
-        if appcastItem.isInformationOnlyUpdate {
-            status = .current
-            return .dismiss
-        }
+        guard state.userInitiated, !appcastItem.isInformationOnlyUpdate else { return .dismiss }
         status = .downloading(nil)
         return .install
     }
@@ -109,14 +139,15 @@ final class AppUpdater: NSObject, SPUUserDriver {
     }
 
     func showUpdateInstalledAndRelaunched(_ relaunched: Bool) async {
+        availableVersion = nil
         status = .current
     }
 
     func dismissUpdateInstallation() {
         switch status {
-        case .checking, .downloading, .extracting, .installing:
+        case .downloading, .extracting, .installing:
             status = .idle
-        case .idle, .current, .failed:
+        case .idle, .checking, .current, .failed:
             break
         }
     }

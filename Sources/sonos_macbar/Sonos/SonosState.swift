@@ -19,6 +19,10 @@ final class SonosState {
         oauthCoordinator?.authState ?? (isAuthenticationRequired ? .disconnected : .connected)
     }
 
+    var isConnected: Bool {
+        authState == .connected && !isAuthenticationRequired
+    }
+
     var showsConnectionView: Bool {
         switch authState {
         case .checking, .notConfigured, .disconnected, .openingBrowser, .waitingForAuthorization, .refreshing, .offline, .failed:
@@ -80,7 +84,7 @@ final class SonosState {
         do {
             players = try await service.fetchPlayers()
             isAuthenticationRequired = false
-            if selectedPlayerID == nil {
+            if !players.contains(where: { $0.id == selectedPlayerID }) {
                 selectedPlayerID = players.first?.id
             }
         } catch {

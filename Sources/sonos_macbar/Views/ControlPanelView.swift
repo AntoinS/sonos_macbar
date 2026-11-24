@@ -26,33 +26,35 @@ struct ControlPanelView: View {
                 .id(player.id)
             } else {
                 VStack(spacing: 10) {
-                    if state.players.count > 1 {
-                        Picker(appLanguage.room, selection: $state.selectedPlayerID) {
-                            ForEach(state.players) { player in
-                                Text(player.roomName)
-                                    .tag(Optional(player.id))
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
-                    }
-
                     if let player = state.selectedPlayer {
-                        PlayerHeaderView(
-                            player: player,
-                            connectionStatus: state.connectionStatus(for: appLanguage),
-                            language: appLanguage,
-                            equalizerAction: { page = .equalizer }
-                        ) {
-                            page = .settings
+                        PanelCard {
+                            PlayerHeaderView(
+                                state: state,
+                                player: player,
+                                language: appLanguage,
+                                equalizerAction: { page = .equalizer }
+                            ) {
+                                page = .settings
+                            }
+                            .padding(10)
                         }
 
-                        VolumeControlView(state: state, player: player, language: appLanguage)
-
-                        HomeTheaterControlsView(state: state, player: player, language: appLanguage)
+                        PanelCard {
+                            VStack(spacing: 9) {
+                                VolumeControlView(state: state, player: player, language: appLanguage)
+                                if player.supportsEnhanceDialog || player.supportsNightMode {
+                                    Divider()
+                                    HomeTheaterControlsView(state: state, player: player, language: appLanguage)
+                                }
+                            }
+                            .padding(10)
+                        }
                     } else if state.showsConnectionView {
-                        SonosConnectionView(state: state, language: appLanguage) {
-                            page = .settings
+                        PanelCard {
+                            SonosConnectionView(state: state, language: appLanguage) {
+                                page = .settings
+                            }
+                            .padding(10)
                         }
                     } else {
                         if state.isLoading {
@@ -95,12 +97,8 @@ private struct SonosConnectionView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Image(systemName: iconName)
-                    .font(.title3)
-                    .symbolRenderingMode(.hierarchical)
-                    .frame(width: 36, height: 36)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            HStack(spacing: 8) {
+                PanelIcon(iconName, tint: .blue)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
@@ -114,13 +112,7 @@ private struct SonosConnectionView: View {
 
                 Spacer(minLength: 8)
 
-                Button(action: settingsAction) {
-                    Image(systemName: "gearshape")
-                        .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .accessibilityLabel(language.settingsTitle)
+                PanelIconButton(title: language.settingsTitle, symbol: "gearshape", action: settingsAction)
             }
 
             if showsProgress {
@@ -172,8 +164,6 @@ private struct SonosConnectionView: View {
                 .controlSize(.regular)
             }
         }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 6)
     }
 
     private var title: String {

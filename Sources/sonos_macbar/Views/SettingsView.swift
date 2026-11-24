@@ -13,40 +13,41 @@ struct SettingsView: View {
         VStack(spacing: 10) {
             PanelHeader(title: language.settingsTitle, closeLabel: language.close, onClose: closeAction)
 
-            VStack(spacing: 0) {
-                connectionRow
-                    .padding(10)
+            PanelCard {
+                VStack(spacing: 0) {
+                    connectionRow.padding(10)
 
-                if !state.players.isEmpty || (isConnected && !state.isLoading) {
-                    rowDivider
-                    roomRow.padding(10)
-                }
+                    if !state.players.isEmpty || (state.isConnected && !state.isLoading) {
+                        rowDivider
+                        roomRow.padding(10)
+                    }
 
-                if isConfirmingDisconnect && canDisconnect {
-                    rowDivider
-                    disconnectConfirmation.padding(10)
+                    if isConfirmingDisconnect && canDisconnect {
+                        rowDivider
+                        disconnectConfirmation.padding(10)
+                    }
                 }
             }
-            .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
 
-            VStack(spacing: 0) {
-                languageRow.padding(10)
-                rowDivider
-                AppUpdateView(language: language).padding(10)
+            PanelCard {
+                VStack(spacing: 0) {
+                    languageRow.padding(10)
+                    rowDivider
+                    AppUpdateView(language: language).padding(10)
+                }
             }
-            .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
         }
     }
 
     private var connectionRow: some View {
         HStack(spacing: 8) {
-            SettingsIcon("hifispeaker.2.fill", tint: .blue)
+            PanelIcon("hifispeaker.2.fill", tint: .blue)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Sonos")
                     .font(.callout.weight(.semibold))
                 HStack(spacing: 5) {
                     Circle()
-                        .fill(isConnected && !state.isLoading && state.errorMessage == nil ? Color.green : Color.secondary)
+                        .fill(state.isConnected && !state.isLoading && state.errorMessage == nil ? Color.green : Color.secondary)
                         .frame(width: 5, height: 5)
                         .accessibilityHidden(true)
                     Text(connectionLabel)
@@ -93,7 +94,7 @@ struct SettingsView: View {
 
     private var roomRow: some View {
         HStack(spacing: 8) {
-            SettingsIcon("house.fill", tint: .secondary)
+            PanelIcon("house.fill", tint: .secondary)
             Text(language.room)
             Spacer()
 
@@ -117,7 +118,7 @@ struct SettingsView: View {
 
     private var languageRow: some View {
         HStack(spacing: 8) {
-            SettingsIcon("globe", tint: .indigo)
+            PanelIcon("globe", tint: .indigo)
             Text(language.language)
             Spacer()
             Picker(language.language, selection: $appLanguageRawValue) {
@@ -154,12 +155,8 @@ struct SettingsView: View {
         .controlSize(.small)
     }
 
-    private var isConnected: Bool {
-        state.authState == .connected && !state.isAuthenticationRequired
-    }
-
     private var canDisconnect: Bool {
-        isConnected || !state.players.isEmpty
+        state.isConnected || !state.players.isEmpty
     }
 
     private var connectionLabel: String {
@@ -190,24 +187,5 @@ struct SettingsView: View {
                 .frame(minWidth: 16)
         }
         .help(title)
-    }
-}
-
-struct SettingsIcon: View {
-    let symbol: String
-    let tint: Color
-
-    init(_ symbol: String, tint: Color) {
-        self.symbol = symbol
-        self.tint = tint
-    }
-
-    var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(tint)
-            .frame(width: 28, height: 28)
-            .background(tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 7))
-            .accessibilityHidden(true)
     }
 }

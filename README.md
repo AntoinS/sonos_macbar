@@ -38,7 +38,7 @@
 ## Screenshots
 
 <div align="center">
-  <img src="assets/screenshots/control-panel.png" width="350" align="top" alt="Sonos Macbar control panel with the Equalizer icon next to Settings" />
+  <img src="assets/screenshots/control-panel.png" width="350" align="top" alt="Two-card control panel with room and source above the volume, voice and night controls" />
   &nbsp;&nbsp;
   <img src="assets/screenshots/equalizer.png" width="350" align="top" alt="Equalizer view with bass, treble, Sub level and loudness controls" />
 </div>
@@ -46,7 +46,7 @@
 <div align="center">
   <img src="assets/screenshots/connect.png" width="350" align="top" alt="Sonos Macbar connect screen" />
   &nbsp;&nbsp;
-  <img src="assets/screenshots/settings.png" width="350" align="top" alt="Compact Sonos Macbar settings with connection, room, language and update controls" />
+  <img src="assets/screenshots/settings.png" width="350" align="top" alt="Sonos Macbar settings with room and language pickers and the Check for updates button" />
 </div>
 
 ## How it works
@@ -117,9 +117,11 @@ does not open a normal Dock window.
 
 ### Updates
 
-Open **Settings → Updates** and select **Update**. The app downloads and verifies
-the signed GitHub release, shows its progress, then installs the update and
-reopens Sonos Macbar.
+Sonos Macbar checks for updates at launch and daily while it runs. Open
+**Settings → Updates** and select **Check** to look for a new version at any time.
+When an update is available, the button turns blue and reads **Update**.
+Selecting it downloads and verifies the signed GitHub release, shows its
+progress, installs the update, and reopens Sonos Macbar.
 
 If you’re using version 0.2.1 or older, install the latest GitHub ZIP once to
 switch to the in-app updater. Quit Sonos Macbar before replacing the app in

@@ -41,29 +41,16 @@ private struct ControlCenterToggleButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 14, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
-                    .frame(width: 18, height: 18)
-
-                Text(title)
-                    .font(.system(.callout, design: .rounded).weight(.medium))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .foregroundStyle(isOn ? Color.accentColor : .primary)
-            .frame(maxWidth: .infinity, minHeight: 34)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color(nsColor: .controlBackgroundColor).opacity(isOn ? 0.68 : 0.34))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(isOn ? Color.accentColor.opacity(0.22) : Color.white.opacity(0.06), lineWidth: 1)
-            )
+            Label(title, systemImage: systemImage)
+                .font(.callout.weight(.medium))
+                .lineLimit(1)
+                .foregroundStyle(isOn ? Color.blue : .secondary)
+                .frame(maxWidth: .infinity, minHeight: 29)
+                .background(
+                    isOn ? Color.blue.opacity(0.13) : .primary.opacity(0.05),
+                    in: RoundedRectangle(cornerRadius: 7)
+                )
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)

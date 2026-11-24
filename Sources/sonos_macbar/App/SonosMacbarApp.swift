@@ -157,6 +157,7 @@ private final class SonosMacbarAppDelegate: NSObject, NSApplicationDelegate {
         )
 
         Task { @MainActor in
+            AppUpdater.shared.start()
             guard let state = Self.state else { return }
             StatusBarController.shared.configure(state: state)
         }

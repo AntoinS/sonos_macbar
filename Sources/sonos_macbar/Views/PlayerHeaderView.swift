@@ -1,78 +1,80 @@
 import SwiftUI
 
 struct PlayerHeaderView: View {
+    @Bindable var state: SonosState
     let player: SonosPlayer
-    let connectionStatus: String
     let language: AppLanguage
     let equalizerAction: () -> Void
     let settingsAction: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "hifispeaker.2.fill")
-                .font(.title3)
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.secondary)
-                .frame(width: 30, height: 30)
+        HStack(spacing: 8) {
+            PanelIcon("hifispeaker.2.fill", tint: .blue)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(player.roomName)
-                    .font(.headline)
-                    .lineLimit(1)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    roomTitle
+                    Circle()
+                        .fill(state.isConnected && !state.isLoading && state.errorMessage == nil ? Color.green : Color.secondary)
+                        .frame(width: 5, height: 5)
+                        .accessibilityHidden(true)
+                }
+                .font(.callout.weight(.semibold))
+                .help(connectionStatus)
 
-                Text(player.deviceName)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                if let playbackSource = player.playbackSource, !playbackSource.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "dot.radiowaves.left.and.right")
-                            .imageScale(.small)
-                            .accessibilityLabel(language.source)
-
-                        Text(playbackSource)
-                            .lineLimit(1)
-                    }
+                Text(deviceSummary)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                }
+                    .lineLimit(1)
             }
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 4)
 
-            Text(connectionStatus)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color(nsColor: .quaternaryLabelColor).opacity(0.16), in: Capsule())
-
-            HStack(spacing: 2) {
-                headerButton("Equalizer", icon: "slider.horizontal.3", action: equalizerAction)
-                headerButton(language.settingsTitle, icon: "gearshape", action: settingsAction)
-            }
+            PanelIconButton(title: "Equalizer", symbol: "slider.horizontal.3", action: equalizerAction)
+            PanelIconButton(title: language.settingsTitle, symbol: "gearshape", action: settingsAction)
         }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 6)
     }
 
-    private func headerButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 13, weight: .medium))
-                .frame(width: 24, height: 24)
-                .contentShape(Rectangle())
+    @ViewBuilder
+    private var roomTitle: some View {
+        if state.players.count > 1 {
+            Menu {
+                Picker(language.room, selection: $state.selectedPlayerID) {
+                    ForEach(state.players) { room in
+                        Text(room.roomName).tag(Optional(room.id))
+                    }
+                }
+                .pickerStyle(.inline)
+            } label: {
+                Text(player.roomName).lineLimit(1)
+            }
+            .menuStyle(.borderlessButton)
+            .accessibilityLabel(language.room)
+            .accessibilityValue("\(player.roomName), \(connectionStatus)")
+        } else {
+            Text(player.roomName)
+                .lineLimit(1)
+                .accessibilityValue(connectionStatus)
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(.secondary)
-        .accessibilityLabel(title)
-        .help(title)
+    }
+
+    private var connectionStatus: String {
+        state.connectionStatus(for: language)
+    }
+
+    private var deviceSummary: String {
+        guard let source = player.playbackSource, !source.isEmpty else { return player.deviceName }
+        return "\(player.deviceName) · \(source)"
     }
 }
 
 #Preview {
-    PlayerHeaderView(player: .mockArc, connectionStatus: "Mock Mode", language: .english, equalizerAction: {}) {}
-        .padding()
-        .frame(width: 340)
+    PlayerHeaderView(
+        state: SonosState(service: MockSonosService()),
+        player: .mockArc,
+        language: .english,
+        equalizerAction: {}
+    ) {}
+    .padding()
+    .frame(width: 340)
 }

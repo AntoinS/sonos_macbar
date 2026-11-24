@@ -204,7 +204,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .english:
             "Voice"
         case .german:
-            "Sprache"
+            "Dialog"
         }
     }
 

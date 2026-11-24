@@ -7,24 +7,15 @@ struct AppUpdateView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 8) {
-                SettingsIcon("arrow.down.circle.fill", tint: .teal)
+                PanelIcon("arrow.down.circle.fill", tint: .teal)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Updates")
                         .font(.callout)
-                    if let version = updater.installedVersion {
-                        Text("v\(version)")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                            .accessibilityLabel(language.isGerman ? "Installierte Version \(version)" : "Installed version \(version)")
-                    }
+                    versionLine
                 }
                 Spacer(minLength: 4)
                 if showsUpdateButton {
-                    Button(action: updater.checkForUpdates) {
-                        Label(language.isGerman ? "Aktualisieren" : "Update", systemImage: "arrow.down")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
+                    updateButton.controlSize(.small)
                 }
             }
 
@@ -38,17 +29,51 @@ struct AppUpdateView: View {
                     progress(language.isGerman ? "Wird vorbereitet …" : "Preparing…", value: value)
                 case .installing:
                     progress(language.isGerman ? "Installation und Neustart …" : "Installing and restarting…")
-                case .current:
-                    message(language.isGerman ? "Auf dem neuesten Stand" : "Up to date", icon: "checkmark.circle")
+                case .idle, .current:
+                    if let version = updater.availableVersion {
+                        message(language.isGerman ? "v\(version) verfügbar" : "v\(version) available", icon: "arrow.down.circle")
+                    }
                 case let .failed(detail):
                     message(language.isGerman ? "Update fehlgeschlagen" : "Update failed", icon: "exclamationmark.circle")
                         .help(detail)
-                case .idle:
-                    EmptyView()
                 }
             } else {
                 message(language.isGerman ? "Updates in diesem Build nicht verfügbar" : "Updates unavailable in this build", icon: "info.circle")
             }
+        }
+    }
+
+    private var versionLine: some View {
+        HStack(spacing: 7) {
+            if let version = updater.installedVersion {
+                Text("v\(version)")
+                    .monospacedDigit()
+                    .accessibilityLabel(language.isGerman ? "Installierte Version \(version)" : "Installed version \(version)")
+            }
+            if case .current = updater.status, updater.availableVersion == nil {
+                Label(language.isGerman ? "Aktuell" : "Up to date", systemImage: "checkmark.circle")
+                    .imageScale(.small)
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+    }
+
+    @ViewBuilder
+    private var updateButton: some View {
+        if updater.availableVersion != nil {
+            Button(action: updater.performUpdateAction) {
+                Label(language.isGerman ? "Aktualisieren" : "Update", systemImage: "arrow.down")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.blue)
+        } else {
+            Button(action: updater.performUpdateAction) {
+                Label(language.isGerman ? "Prüfen" : "Check", systemImage: "arrow.clockwise")
+            }
+            .buttonStyle(.bordered)
+            .help(language.isGerman ? "Nach Updates suchen" : "Check for updates")
         }
     }
 

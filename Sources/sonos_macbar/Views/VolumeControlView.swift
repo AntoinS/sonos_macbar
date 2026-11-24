@@ -6,19 +6,16 @@ struct VolumeControlView: View {
     let language: AppLanguage
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Button {
                 Task { await state.setMuted(!player.muted) }
             } label: {
-                Image(systemName: speakerImage)
-                    .font(.system(size: 15, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(player.muted ? .secondary : .primary)
-                    .frame(width: 28, height: 28)
+                PanelIcon(speakerImage, tint: .secondary)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(player.muted ? language.unmute : language.mute)
+            .help(player.muted ? language.unmute : language.mute)
 
             AudioSlider(
                 title: language.volume,
@@ -32,8 +29,6 @@ struct VolumeControlView: View {
                 Task { await state.commitVolume(value) }
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
     }
 
     private var speakerImage: String {
