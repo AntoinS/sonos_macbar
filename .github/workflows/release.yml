@@ -15,8 +15,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Package app
         run: |
@@ -29,7 +27,11 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           ARCHIVE_PATH="dist/Sonos-Macbar-${VERSION}.zip"
+          TAG_REF="refs/tags/$GITHUB_REF_NAME"
+          git fetch --no-tags origin "+$TAG_REF:$TAG_REF"
+          test "$(git rev-parse "$TAG_REF^{commit}")" = "$(git rev-parse HEAD)"
+          git for-each-ref --format='%(contents)' "$TAG_REF" |
           gh release create "$GITHUB_REF_NAME" "$ARCHIVE_PATH" \
             --title "Sonos Macbar ${VERSION}" \
             --verify-tag \
-            --notes-from-tag
+            --notes-file -
