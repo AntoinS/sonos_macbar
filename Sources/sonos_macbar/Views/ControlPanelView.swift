@@ -3,8 +3,11 @@ import SwiftUI
 struct ControlPanelView: View {
     @Bindable var state: SonosState
     @AppStorage(AppLanguage.storageKey) private var appLanguageRawValue = AppLanguage.english.rawValue
-    @State private var isShowingSettings = false
-    @State private var isEqualizerExpanded = false
+    @State private var page: Page = .controls
+
+    private enum Page {
+        case controls, equalizer, settings
+    }
 
     private var appLanguage: AppLanguage {
         AppLanguage(rawValue: appLanguageRawValue) ?? .english
@@ -12,10 +15,15 @@ struct ControlPanelView: View {
 
     var body: some View {
         Group {
-            if isShowingSettings {
+            if page == .settings {
                 EmbeddedSettingsView(state: state, language: appLanguage, appLanguageRawValue: $appLanguageRawValue) {
-                    isShowingSettings = false
+                    page = .controls
                 }
+            } else if page == .equalizer, let player = state.selectedPlayer {
+                EqualizerView(player: player, language: appLanguage) {
+                    page = .controls
+                }
+                .id(player.id)
             } else {
                 VStack(spacing: 10) {
                     if state.players.count > 1 {
@@ -35,18 +43,29 @@ struct ControlPanelView: View {
                             connectionStatus: state.connectionStatus(for: appLanguage),
                             language: appLanguage
                         ) {
-                            isShowingSettings = true
+                            page = .settings
                         }
 
                         VolumeControlView(state: state, player: player, language: appLanguage)
 
                         HomeTheaterControlsView(state: state, player: player, language: appLanguage)
 
-                        EqualizerView(playerID: player.id, language: appLanguage, isExpanded: $isEqualizerExpanded)
-                            .id(player.id)
+                        Button {
+                            page = .equalizer
+                        } label: {
+                            HStack {
+                                Label("Equalizer", systemImage: "slider.horizontal.3")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
                     } else if state.showsConnectionView {
                         SonosConnectionView(state: state, language: appLanguage) {
-                            isShowingSettings = true
+                            page = .settings
                         }
                     } else {
                         if state.isLoading {
@@ -75,6 +94,9 @@ struct ControlPanelView: View {
         }
         .task(id: state.selectedPlayerID) {
             await state.pollSelectedPlayerState()
+        }
+        .onChange(of: state.selectedPlayer?.id) { _, id in
+            if id == nil, page == .equalizer { page = .controls }
         }
     }
 }
@@ -207,21 +229,7 @@ private struct EmbeddedSettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text(language.settingsTitle)
-                    .font(.headline)
-
-                Spacer()
-
-                Button(action: closeAction) {
-                    Image(systemName: "xmark.circle.fill")
-                        .symbolRenderingMode(.hierarchical)
-                        .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .accessibilityLabel(language.close)
-            }
+            PanelHeader(title: language.settingsTitle, closeLabel: language.close, onClose: closeAction)
 
             VStack(spacing: 9) {
                 SettingsInfoRow(title: language.status, value: snapshot?.connectionStatus ?? state.connectionStatus(for: language))
@@ -342,6 +350,28 @@ private struct EmbeddedSettingsView: View {
 
     private func refreshSnapshot() async {
         snapshot = await state.accountSnapshot(language: language)
+    }
+}
+
+struct PanelHeader: View {
+    let title: String
+    let closeLabel: String
+    let onClose: () -> Void
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.headline)
+            Spacer()
+            Button(action: onClose) {
+                Image(systemName: "xmark.circle.fill")
+                    .symbolRenderingMode(.hierarchical)
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel(closeLabel)
+        }
     }
 }
 

@@ -1,30 +1,31 @@
 import SwiftUI
 
 struct EqualizerView: View {
+    let player: SonosPlayer
     let language: AppLanguage
-    @Binding var isExpanded: Bool
+    let onClose: () -> Void
     @State private var state: EqualizerState
     @State private var reloadCount = 0
 
-    init(playerID: SonosPlayer.ID, language: AppLanguage, isExpanded: Binding<Bool>) {
+    init(player: SonosPlayer, language: AppLanguage, onClose: @escaping () -> Void) {
+        self.player = player
         self.language = language
-        _isExpanded = isExpanded
-        _state = State(initialValue: EqualizerState(playerID: playerID))
+        self.onClose = onClose
+        _state = State(initialValue: EqualizerState(playerID: player.id))
     }
 
     var body: some View {
-        DisclosureGroup(isExpanded: $isExpanded) {
-            if isExpanded {
-                content
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 6)
-                    .task(id: reloadCount) {
-                        await state.load()
-                    }
-            }
-        } label: {
-            Label("Equalizer", systemImage: "slider.horizontal.3")
-                .font(.callout.weight(.medium))
+        VStack(alignment: .leading, spacing: 12) {
+            PanelHeader(title: "Equalizer", closeLabel: language.close, onClose: onClose)
+            Text(player.roomName)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Divider()
+            content
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .task(id: reloadCount) {
+            await state.load()
         }
     }
 
@@ -44,17 +45,17 @@ struct EqualizerView: View {
             }
         case .ready:
             VStack(alignment: .leading, spacing: 6) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     slider(.bass)
                     slider(.treble)
+                    slider(.subLevel)
                     if let loudness = state.values[.loudness] {
-                        Toggle("Loudness", isOn: Binding(
+                        Toggle(language.equalizerLabel(.loudness), isOn: Binding(
                             get: { loudness == 1 },
                             set: { save(.loudness, value: $0 ? 1 : 0) }
                         ))
                         .toggleStyle(.switch)
                     }
-                    slider(.subLevel)
                 }
                 .disabled(state.isSaving)
 
@@ -73,50 +74,19 @@ struct EqualizerView: View {
     @ViewBuilder
     private func slider(_ control: EqualizerControl) -> some View {
         if let value = state.values[control] {
-            EqualizerSlider(title: language.equalizerLabel(control), value: value, range: control.range) {
-                save(control, value: $0)
+            let title = language.equalizerLabel(control)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                AudioSlider(title: title, value: value, range: control.range) {
+                    save(control, value: $0)
+                }
             }
         }
     }
 
     private func save(_ control: EqualizerControl, value: Int) {
         Task { await state.save(control, value: value) }
-    }
-}
-
-private struct EqualizerSlider: View {
-    let title: String
-    let value: Int
-    let range: ClosedRange<Int>
-    let save: (Int) -> Void
-    @State private var draft: Double?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            LabeledContent(title, value: (draft.map(Int.init) ?? value).formatted())
-                .monospacedDigit()
-                .accessibilityHidden(true)
-            Slider(value: Binding(
-                get: { draft ?? Double(value) },
-                set: { newValue in
-                    if draft != nil {
-                        draft = newValue
-                    } else {
-                        save(Int(newValue))
-                    }
-                }
-            ), in: Double(range.lowerBound)...Double(range.upperBound), step: 1) {
-                Text(title)
-            } onEditingChanged: { editing in
-                if editing {
-                    draft = Double(value)
-                } else if let draft {
-                    self.draft = nil
-                    save(Int(draft))
-                }
-            }
-            .labelsHidden()
-            .accessibilityLabel(title)
-        }
     }
 }

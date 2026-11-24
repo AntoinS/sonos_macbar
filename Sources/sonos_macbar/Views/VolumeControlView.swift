@@ -5,9 +5,6 @@ struct VolumeControlView: View {
     let player: SonosPlayer
     let language: AppLanguage
 
-    @State private var draftVolume: Double = 35
-    @State private var isEditing = false
-
     var body: some View {
         HStack(spacing: 10) {
             Button {
@@ -23,72 +20,20 @@ struct VolumeControlView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(player.muted ? language.unmute : language.mute)
 
-            GeometryReader { proxy in
-                let width = max(proxy.size.width, 1)
-                let progress = max(0, min(1, draftVolume / 100))
-
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color(nsColor: .tertiaryLabelColor).opacity(0.22))
-                        .frame(height: 4)
-
-                    Capsule()
-                        .fill(Color.primary.opacity(player.muted ? 0.22 : 0.55))
-                        .frame(width: max(4, width * progress), height: 4)
-
-                    Circle()
-                        .fill(Color(nsColor: .controlBackgroundColor))
-                        .frame(width: 14, height: 14)
-                        .overlay(
-                            Circle()
-                                .stroke(Color.primary.opacity(0.14), lineWidth: 1)
-                        )
-                        .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
-                        .offset(x: max(0, min(width - 14, width * progress - 7)))
-                }
-                .frame(height: 28)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            isEditing = true
-                            updateDraftVolume(from: value.location.x, width: width)
-                        }
-                        .onEnded { value in
-                            updateDraftVolume(from: value.location.x, width: width)
-                            isEditing = false
-                            Task {
-                                await state.commitVolume(Int(draftVolume.rounded()))
-                            }
-                        }
-                )
+            AudioSlider(
+                title: language.volume,
+                value: player.volume,
+                range: 0...100,
+                isDimmed: player.muted,
+                displayValue: { player.muted ? language.off : String($0) },
+                spokenValue: { language.volumeValue(isMuted: player.muted, volume: $0) },
+                onPreview: { state.updateVolumeLive($0) }
+            ) { value in
+                Task { await state.commitVolume(value) }
             }
-            .frame(height: 28)
-
-            Text(player.muted ? language.off : "\(Int(draftVolume.rounded()))")
-                .font(.system(.callout, design: .rounded).monospacedDigit().weight(.medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 34, alignment: .trailing)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(language.volume)
-        .accessibilityValue(language.volumeValue(isMuted: player.muted, volume: Int(draftVolume.rounded())))
-        .onAppear {
-            draftVolume = Double(player.volume)
-        }
-        .onChange(of: player.volume) { _, newValue in
-            guard !isEditing else { return }
-            draftVolume = Double(newValue)
-        }
-    }
-
-    private func updateDraftVolume(from locationX: CGFloat, width: CGFloat) {
-        let ratio = max(0, min(1, locationX / width))
-        let newValue = (ratio * 100).rounded()
-        draftVolume = newValue
-        state.updateVolumeLive(Int(newValue))
     }
 
     private var speakerImage: String {
@@ -96,7 +41,7 @@ struct VolumeControlView: View {
             return "speaker.slash.fill"
         }
 
-        switch draftVolume {
+        switch player.volume {
         case 0:
             return "speaker.slash.fill"
         case 1..<45:

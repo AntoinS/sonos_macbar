@@ -28,7 +28,7 @@
 - 📡 See the current playback source at a glance
 - 🔁 Keep the volume slider in sync with external remote changes
 - 🔇 Mute your Sonos with one click
-- 🎚️ Adjust bass, treble and loudness, plus Sub level in rooms with a bonded Sonos Sub or Sub Mini
+- 🎚️ Adjust bass, treble and loudness in a dedicated Equalizer view. Rooms with a bonded Sonos Sub or Sub Mini also get a Sub level slider.
 - 🗣️ Toggle Voice enhancement
 - 🌙 Toggle Night mode
 - 🏠 Choose between Sonos rooms
@@ -38,11 +38,15 @@
 ## Screenshots
 
 <div align="center">
-  <img src="assets/screenshots/connect.png" width="360" alt="Sonos Macbar connect screen" />
-  <br /><br />
-  <img src="assets/screenshots/control-panel.png" width="360" alt="Sonos Macbar control panel with playback source" />
+  <img src="assets/screenshots/control-panel.png" width="350" align="top" alt="Sonos Macbar control panel with a dedicated Equalizer button" />
   &nbsp;&nbsp;
-  <img src="assets/screenshots/settings.png" width="360" alt="Sonos Macbar settings" />
+  <img src="assets/screenshots/equalizer.png" width="350" align="top" alt="Equalizer view with bass, treble, Sub level and loudness controls" />
+</div>
+
+<div align="center">
+  <img src="assets/screenshots/connect.png" width="350" align="top" alt="Sonos Macbar connect screen" />
+  &nbsp;&nbsp;
+  <img src="assets/screenshots/settings.png" width="350" align="top" alt="Sonos Macbar settings with a GitHub update check" />
 </div>
 
 ## How it works
@@ -55,10 +59,13 @@
 No tokens need to be copied or pasted. The app keeps the connection in the
 macOS Keychain.
 
-Open **Equalizer** in the control panel to adjust the selected room. Your Mac
-and Sonos speaker must be on the same local network. If prompted, allow
-local network access. You can change this permission under **System Settings →
-Privacy & Security → Local Network**.
+Select **Equalizer** in the control panel to open a separate view for the
+selected room. Bass, treble and Sub level use the same slider design as the
+volume control. Select **×** to return to the control panel.
+
+Your Mac and Sonos speaker must be on the same local network. If prompted,
+allow local network access under **System Settings → Privacy & Security →
+Local Network**.
 
 ## Install
 
@@ -111,6 +118,9 @@ Open **Settings → Updates → Check for Updates** to check the latest stable
 GitHub release. **Update with Homebrew** runs the upgrade in Terminal. If you
 installed the app manually, download the ZIP, quit Sonos Macbar and replace
 the app in Applications.
+
+See [GitHub Releases](https://github.com/AntoinS/sonos_macbar/releases) for
+patch notes and downloads.
 
 ## Uninstall
 
