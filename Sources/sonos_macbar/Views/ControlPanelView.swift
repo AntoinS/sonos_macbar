@@ -4,6 +4,7 @@ struct ControlPanelView: View {
     @Bindable var state: SonosState
     @AppStorage(AppLanguage.storageKey) private var appLanguageRawValue = AppLanguage.english.rawValue
     @State private var isShowingSettings = false
+    @State private var isEqualizerExpanded = false
 
     private var appLanguage: AppLanguage {
         AppLanguage(rawValue: appLanguageRawValue) ?? .english
@@ -40,6 +41,9 @@ struct ControlPanelView: View {
                         VolumeControlView(state: state, player: player, language: appLanguage)
 
                         HomeTheaterControlsView(state: state, player: player, language: appLanguage)
+
+                        EqualizerView(playerID: player.id, language: appLanguage, isExpanded: $isEqualizerExpanded)
+                            .id(player.id)
                     } else if state.showsConnectionView {
                         SonosConnectionView(state: state, language: appLanguage) {
                             isShowingSettings = true

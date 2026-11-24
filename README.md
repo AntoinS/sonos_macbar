@@ -12,7 +12,7 @@
     <a href="#features">Features</a> ·
     <a href="#screenshots">Screenshots</a> ·
     <a href="#install">Install</a> ·
-    <a href="#development">Development</a>
+    <a href="#uninstall">Uninstall</a>
   </p>
 
   <p>
@@ -28,6 +28,7 @@
 - 📡 See the current playback source at a glance
 - 🔁 Keep the volume slider in sync with external remote changes
 - 🔇 Mute your Sonos with one click
+- 🎚️ Adjust bass, treble and loudness, plus Sub level in rooms with a bonded Sonos Sub or Sub Mini
 - 🗣️ Toggle Voice enhancement
 - 🌙 Toggle Night mode
 - 🏠 Choose between Sonos rooms
@@ -54,7 +55,14 @@
 No tokens need to be copied or pasted. The app keeps the connection in the
 macOS Keychain.
 
+Open **Equalizer** in the control panel to adjust the selected room. Your Mac
+and Sonos speaker must be on the same local network. If prompted, allow
+local network access. You can change this permission under **System Settings →
+Privacy & Security → Local Network**.
+
 ## Install
+
+The prebuilt release requires an Apple silicon Mac with macOS 14 or later.
 
 Install with Homebrew:
 

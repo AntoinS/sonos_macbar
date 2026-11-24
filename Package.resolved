@@ -1,0 +1,15 @@
+{
+  "originHash" : "a87b994b535c39a2dd54636979100fc9eb6c34b7d16284de9815b4f83672cdf9",
+  "pins" : [
+    {
+      "identity" : "upnpcast",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/CreatureSurvive/UPnPCast.git",
+      "state" : {
+        "revision" : "3550fd5c940f09faebedcb0e6f63593db475265f",
+        "version" : "1.0.0"
+      }
+    }
+  ],
+  "version" : 3
+}

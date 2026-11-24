@@ -22,6 +22,34 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         }
     }
 
+    func equalizerLabel(_ control: EqualizerControl) -> String {
+        switch (self, control) {
+        case (_, .bass): "Bass"
+        case (.english, .treble): "Treble"
+        case (.german, .treble): "Höhen"
+        case (_, .loudness): "Loudness"
+        case (.english, .subLevel): "Sub Level"
+        case (.german, .subLevel): "Sub-Pegel"
+        }
+    }
+
+    var equalizerLoading: String {
+        self == .german ? "Equalizer wird geladen …" : "Loading equalizer…"
+    }
+
+    var equalizerUnavailable: String {
+        switch self {
+        case .english:
+            "The equalizer is unavailable. Check that your Mac and Sonos are on the same network and that Sonos Macbar has Local Network access in System Settings."
+        case .german:
+            "Der Equalizer ist nicht erreichbar. Prüfe, ob Mac und Sonos im selben Netzwerk sind und Sonos Macbar in den Systemeinstellungen Zugriff auf das lokale Netzwerk hat."
+        }
+    }
+
+    var equalizerWriteFailed: String {
+        self == .german ? "Die Änderung konnte nicht übernommen werden." : "The change couldn’t be applied."
+    }
+
     var settingsTitle: String {
         switch self {
         case .english:

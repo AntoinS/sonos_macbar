@@ -5,7 +5,7 @@ APP_NAME="Sonos Macbar"
 EXECUTABLE_NAME="sonos_macbar"
 BUNDLE_EXECUTABLE_NAME="SonosMacbar"
 BUNDLE_ID="${SONOS_MACBAR_BUNDLE_ID:-de.alania-bonn.sonos-macbar}"
-VERSION="${SONOS_MACBAR_VERSION:-0.1.1}"
+VERSION="${SONOS_MACBAR_VERSION:-0.2.0}"
 BUILD_DIR=".build/release"
 SCRATCH_DIR="${TMPDIR:-/tmp}/sonos_macbar-swiftpm-build"
 DIST_DIR="${SONOS_MACBAR_DIST_DIR:-dist}"
@@ -39,6 +39,7 @@ cp "${SCRATCH_DIR}/release/${EXECUTABLE_NAME}" "${MACOS_DIR}/${BUNDLE_EXECUTABLE
 chmod +x "${MACOS_DIR}/${BUNDLE_EXECUTABLE_NAME}"
 cp "${APP_ICON_SOURCE}" "${RESOURCES_DIR}/${APP_ICON}"
 cp "${MENU_BAR_ICON_SOURCE}" "${RESOURCES_DIR}/${MENU_BAR_ICON}"
+cp "Resources/UPnPCast-LICENSE.txt" "${RESOURCES_DIR}/"
 
 cat > "${CONTENTS_DIR}/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -84,6 +85,17 @@ cat > "${CONTENTS_DIR}/Info.plist" <<PLIST
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Sonos Macbar uses your local network to adjust your Sonos equalizer.</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_sonos._tcp</string>
+    </array>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
 </dict>
 </plist>
 PLIST
