@@ -283,6 +283,10 @@ private struct EmbeddedSettingsView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.regular)
+
+            Divider()
+
+            AppUpdateView(language: language)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .task {

@@ -8,6 +8,8 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var isGerman: Bool { self == .german }
+
     static var current: AppLanguage {
         let rawValue = UserDefaults.standard.string(forKey: storageKey)
         return rawValue.flatMap(AppLanguage.init(rawValue:)) ?? .english

@@ -105,6 +105,13 @@ cp -R "dist/Sonos Macbar.app" /Applications/
 Then open **Sonos Macbar** from `/Applications`. It runs as a menu bar app and
 does not open a normal Dock window.
 
+### Updates
+
+Open **Settings → Updates → Check for Updates** to check the latest stable
+GitHub release. **Update with Homebrew** runs the upgrade in Terminal. If you
+installed the app manually, download the ZIP, quit Sonos Macbar and replace
+the app in Applications.
+
 ## Uninstall
 
 If installed with Homebrew:
