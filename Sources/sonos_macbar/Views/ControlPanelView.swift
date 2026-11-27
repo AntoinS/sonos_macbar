@@ -26,7 +26,7 @@ struct ControlPanelView: View {
                 .id(player.id)
             } else {
                 VStack(spacing: 10) {
-                    if let player = state.selectedPlayer {
+                    if let player = state.selectedPlayer, !state.isAuthenticationRequired {
                         PanelCard {
                             PlayerHeaderView(
                                 state: state,
@@ -66,8 +66,8 @@ struct ControlPanelView: View {
                         }
                     }
 
-                    if let errorMessage = state.errorMessage {
-                        Text(errorMessage)
+                    if let errorMessage = state.errorMessage, state.rateLimitedUntil == nil || state.selectedPlayer != nil {
+                        Text(state.rateLimitedUntil == nil ? errorMessage : appLanguage.sonosRateLimited)
                             .font(.footnote)
                             .foregroundStyle(.red)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -78,11 +78,12 @@ struct ControlPanelView: View {
         }
         .padding(12)
         .background(.regularMaterial)
-        .task {
-            await state.start()
-        }
-        .task(id: state.selectedPlayerID) {
-            await state.pollSelectedPlayerState()
+        .background {
+            if state.isPopoverOpen {
+                Color.clear.task(id: state.selectedPlayerID) {
+                    await state.pollSelectedPlayerState()
+                }
+            }
         }
         .onChange(of: state.selectedPlayer?.id) { _, id in
             if id == nil, page == .equalizer { page = .controls }
@@ -121,7 +122,7 @@ private struct SonosConnectionView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            switch state.authState {
+            switch connectionState {
             case .openingBrowser, .waitingForAuthorization:
                 Button {
                     state.reopenSonosLogin()
@@ -142,7 +143,11 @@ private struct SonosConnectionView: View {
 
             case .offline, .failed:
                 Button {
-                    Task { await state.loadPlayers() }
+                    if case .failed = connectionState {
+                        state.connectSonos()
+                    } else {
+                        Task { await state.loadPlayers() }
+                    }
                 } label: {
                     Label(language.retry, systemImage: "arrow.clockwise")
                         .frame(maxWidth: .infinity)
@@ -150,7 +155,7 @@ private struct SonosConnectionView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
 
-            case .notConfigured:
+            case .notConfigured, .checking, .refreshing:
                 EmptyView()
 
             default:
@@ -167,15 +172,21 @@ private struct SonosConnectionView: View {
     }
 
     private var title: String {
-        language.connectionTitle(for: state.authState)
+        language.connectionTitle(for: connectionState)
     }
 
     private var message: String {
-        language.connectionMessage(for: state.authState)
+        state.rateLimitedUntil == nil ? language.connectionMessage(for: connectionState) : language.sonosRateLimited
+    }
+
+    private var connectionState: SonosAuthState {
+        guard state.authState == .connected else { return state.authState }
+        if state.isAuthenticationRequired { return .disconnected }
+        return state.errorMessage == nil ? .connected : .offline
     }
 
     private var iconName: String {
-        switch state.authState {
+        switch connectionState {
         case .offline, .failed:
             "wifi.exclamationmark"
         case .openingBrowser, .waitingForAuthorization:
@@ -186,7 +197,7 @@ private struct SonosConnectionView: View {
     }
 
     private var showsProgress: Bool {
-        switch state.authState {
+        switch connectionState {
         case .checking, .openingBrowser, .waitingForAuthorization, .refreshing:
             true
         default:
@@ -218,6 +229,8 @@ struct PanelHeader: View {
 }
 
 #Preview {
-    ControlPanelView(state: SonosState(service: MockSonosService()))
+    let state = SonosState(service: MockSonosService())
+    ControlPanelView(state: state)
         .frame(width: 340)
+        .task { await state.loadPlayers() }
 }

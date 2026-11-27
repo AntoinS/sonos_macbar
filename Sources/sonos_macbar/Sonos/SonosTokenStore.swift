@@ -9,24 +9,26 @@ struct SonosTokenStore: Sendable {
     private let brokerSessionService = "de.alania.sonos-macbar.broker-session"
     private let accessTokenService = "de.alania.sonos-macbar.access-token"
     private let accessExpiryService = "de.alania.sonos-macbar.access-expiry"
-    private let keychainAccount = "default"
+    private let keychainAccount: String
 
     init(
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        configuration: SonosAuthConfiguration = .production
+        configuration: SonosAuthConfiguration = .production,
+        keychainAccount: String = "default"
     ) {
         self.environment = environment
         self.developmentAccessTokenEnvironmentKey = configuration.developmentAccessTokenEnvironmentKey
+        self.keychainAccount = keychainAccount
     }
 
-    func savedCredentials() async -> SonosStoredCredentials? {
-        await keychainData(service: credentialsService).flatMap { data in
-            try? JSONDecoder().decode(SonosStoredCredentials.self, from: data)
+    func savedCredentials() async throws -> SonosStoredCredentials? {
+        try await keychainData(service: credentialsService).map { data in
+            try JSONDecoder().decode(SonosStoredCredentials.self, from: data)
         }
     }
 
-    func legacyBrokerSessionId() async -> String? {
-        await keychainString(service: brokerSessionService)
+    func legacyBrokerSessionId() async throws -> String? {
+        try await keychainString(service: brokerSessionService)
     }
 
     func developmentAccessToken() -> String? {
@@ -43,7 +45,7 @@ struct SonosTokenStore: Sendable {
     }
 
     func deleteAccessTokenFromCredentials() async throws {
-        guard var credentials = await savedCredentials() else {
+        guard var credentials = try await savedCredentials() else {
             try await deleteString(service: accessTokenService)
             try await deleteString(service: accessExpiryService)
             return
@@ -108,8 +110,8 @@ struct SonosTokenStore: Sendable {
         }
     }
 
-    private func keychainString(service: String) async -> String? {
-        guard let data = await keychainData(service: service),
+    private func keychainString(service: String) async throws -> String? {
+        guard let data = try await keychainData(service: service),
               let value = String(data: data, encoding: .utf8) else {
             return nil
         }
@@ -117,19 +119,19 @@ struct SonosTokenStore: Sendable {
         return Self.nonEmptyToken(value)
     }
 
-    private func keychainData(service: String) async -> Data? {
+    private func keychainData(service: String) async throws -> Data? {
         var query = keychainBaseQuery(service: service)
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         query[kSecReturnData as String] = true
 
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess,
-              let data = item as? Data else {
-            return nil
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess else {
+            throw SonosTokenStoreError.keychainFailure(status)
         }
 
-        return data
+        return item as? Data
     }
 
     private func keychainBaseQuery(service: String) -> [String: Any] {

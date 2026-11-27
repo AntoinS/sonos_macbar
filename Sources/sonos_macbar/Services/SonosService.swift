@@ -3,10 +3,13 @@ import Foundation
 actor SonosService: SonosAPI {
     private let baseURL = URL(string: "https://api.ws.sonos.com/control/api/v1")!
     private let auth: SonosAuth
+    private let session: URLSession
     private var cachedPlayers: [SonosPlayer] = []
+    private var throttle = SonosRequestThrottle()
 
-    init(auth: SonosAuth = SonosAuth()) {
+    init(auth: SonosAuth = SonosAuth(), session: URLSession = .shared) {
         self.auth = auth
+        self.session = session
     }
 
     func fetchPlayers() async throws -> [SonosPlayer] {
@@ -150,6 +153,7 @@ actor SonosService: SonosAPI {
     }
 
     private func request<Body: Encodable, Response: Decodable>(_ method: HTTPMethod, path: String, body: Body?) async throws -> Response {
+        try throttle.check()
         let token = try await auth.accessToken()
         do {
             return try await request(method, path: path, body: body, token: token)
@@ -158,8 +162,12 @@ actor SonosService: SonosAPI {
                 throw error
             }
 
-            let refreshedToken = try await auth.refreshAccessToken()
-            return try await request(method, path: path, body: body, token: refreshedToken)
+            let refreshedToken = try await auth.accessToken(replacing: token)
+            do {
+                return try await request(method, path: path, body: body, token: refreshedToken)
+            } catch SonosAPIError.requestFailed(statusCode: 401, _) {
+                throw SonosAPIError.credentialsRequired
+            }
         }
     }
 
@@ -169,6 +177,8 @@ actor SonosService: SonosAPI {
         body: Body?,
         token: String
     ) async throws -> Response {
+        try Task.checkCancellation()
+        try throttle.check()
         let url = baseURL.appending(path: path)
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
@@ -181,18 +191,22 @@ actor SonosService: SonosAPI {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SonosAPIError.requestFailed(statusCode: -1, message: nil)
         }
 
+        if httpResponse.statusCode == 429 {
+            throw throttle.recordLimit(httpResponse, data: data)
+        }
         guard 200..<300 ~= httpResponse.statusCode else {
             let error = try? JSONDecoder().decode(SonosErrorResponse.self, from: data)
             throw SonosAPIError.requestFailed(statusCode: httpResponse.statusCode, message: error?.message)
         }
 
-        guard !data.isEmpty else {
-            return EmptyResponse() as! Response
+        throttle.recordSuccess()
+        if data.isEmpty, let empty = EmptyResponse() as? Response {
+            return empty
         }
 
         do {

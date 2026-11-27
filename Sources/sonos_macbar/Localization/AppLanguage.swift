@@ -190,6 +190,12 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         }
     }
 
+    var sonosRateLimited: String {
+        isGerman
+            ? "Sonos erhält gerade zu viele Anfragen. Die App versucht es automatisch erneut."
+            : "Sonos is receiving too many requests. The app will retry automatically."
+    }
+
     var reopenBrowser: String {
         switch self {
         case .english:

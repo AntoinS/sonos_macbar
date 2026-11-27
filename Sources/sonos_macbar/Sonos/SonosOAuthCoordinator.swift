@@ -24,18 +24,22 @@ final class SonosOAuthCoordinator {
         self.auth = auth
     }
 
-    func prepareAtLaunch() async {
-        if let auth, (try? await auth.accessToken()) != nil {
+    func restoreSession() async throws {
+        guard loginTask == nil, authState == .checking || authState == .offline else { return }
+        do {
+            if let auth {
+                _ = try await auth.accessToken()
+            } else if try await tokenStore.savedCredentials()?.validAccessToken == nil {
+                throw SonosAPIError.credentialsRequired
+            }
+            try Task.checkCancellation()
             authState = .connected
-            return
+        } catch SonosAPIError.credentialsRequired {
+            authState = .disconnected
+        } catch {
+            if !Task.isCancelled { authState = .offline }
+            throw error
         }
-
-        if auth == nil, await tokenStore.savedCredentials()?.validAccessToken != nil {
-            authState = .connected
-            return
-        }
-
-        authState = .disconnected
     }
 
     func beginLogin(onConnected: @escaping @MainActor () async -> Void) {
@@ -74,8 +78,11 @@ final class SonosOAuthCoordinator {
 
     func disconnect() async throws {
         cancelLogin()
-        try await tokenStore.deleteAllSonosCredentials()
-        await auth?.clearCachedAccessToken()
+        if let auth {
+            try await auth.disconnect()
+        } else {
+            try await tokenStore.deleteAllSonosCredentials()
+        }
         authState = .disconnected
     }
 
@@ -105,13 +112,8 @@ final class SonosOAuthCoordinator {
 
             authState = .refreshing
             let token = try await authClient.token(loginId: start.loginId)
-            try await tokenStore.saveCredentials(
-                SonosStoredCredentials(
-                    brokerSessionId: start.loginId,
-                    accessToken: token.accessToken,
-                    accessTokenExpiresAt: token.expiresAt
-                )
-            )
+            try Task.checkCancellation()
+            try await tokenStore.saveCredentials(token.credentials(fallbackSessionId: start.loginId))
             await auth?.cacheAccessToken(token.accessToken, expiresAt: token.expiresAt)
             authState = .connected
             await onConnected()
@@ -139,6 +141,10 @@ final class SonosOAuthCoordinator {
                 case .failed:
                     throw SonosOAuthCoordinatorError.authorizationDeclined
                 }
+            } catch let limited as SonosRateLimited {
+                let waitUntil = min(limited.retryAt, deadline)
+                try await Task.sleep(for: .seconds(max(0, waitUntil.timeIntervalSinceNow)))
+                continue
             } catch let error as SonosAuthClientError {
                 if case .requestFailed(statusCode: 404) = error {
                     throw error

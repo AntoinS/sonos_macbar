@@ -31,12 +31,13 @@ struct SonosMacbarApp: App {
 }
 
 @MainActor
-private final class StatusBarController: NSObject {
+private final class StatusBarController: NSObject, NSPopoverDelegate {
     static let shared = StatusBarController()
 
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var contextMenu: NSMenu?
+    private var state: SonosState?
 
     func configure(state: SonosState) {
         guard statusItem == nil else { return }
@@ -53,6 +54,7 @@ private final class StatusBarController: NSObject {
 
         let popover = NSPopover()
         popover.behavior = .transient
+        popover.delegate = self
         popover.animates = true
         popover.contentSize = NSSize(width: 340, height: 1)
         popover.contentViewController = NSHostingController(
@@ -73,6 +75,15 @@ private final class StatusBarController: NSObject {
         self.statusItem = statusItem
         self.popover = popover
         self.contextMenu = menu
+        self.state = state
+    }
+
+    func popoverWillShow(_ notification: Notification) {
+        state?.isPopoverOpen = true
+    }
+
+    func popoverWillClose(_ notification: Notification) {
+        state?.isPopoverOpen = false
     }
 
     private static func menuBarIcon() -> NSImage? {

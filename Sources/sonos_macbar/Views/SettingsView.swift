@@ -53,7 +53,7 @@ struct SettingsView: View {
                     Text(connectionLabel)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .help(state.errorMessage ?? state.authState.userMessage(for: language))
+                        .help(state.rateLimitedUntil != nil ? language.sonosRateLimited : state.errorMessage ?? state.authState.userMessage(for: language))
                 }
             }
 
@@ -76,9 +76,9 @@ struct SettingsView: View {
                             Label(language.connectSonos, systemImage: "link")
                         }
                     }
-                } else if canDisconnect {
+                } else if canDisconnect || state.authState == .offline {
                     iconButton(language.reloadRooms, symbol: "arrow.clockwise") {
-                        Task { await state.reloadPlayers() }
+                        Task { await state.loadPlayers() }
                     }
                 }
                 if canDisconnect {

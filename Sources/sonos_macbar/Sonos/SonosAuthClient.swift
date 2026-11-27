@@ -4,15 +4,16 @@ actor SonosAuthClient {
     private let configuration: SonosAuthConfiguration
     private let session: URLSession
     private let decoder = JSONDecoder()
+    private var throttle = SonosRequestThrottle()
 
-    init(configuration: SonosAuthConfiguration = .production) {
+    init(configuration: SonosAuthConfiguration = .production, session: URLSession? = nil) {
         self.configuration = configuration
 
         let sessionConfiguration = URLSessionConfiguration.ephemeral
         sessionConfiguration.timeoutIntervalForRequest = 15
         sessionConfiguration.timeoutIntervalForResource = 15
         sessionConfiguration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        session = URLSession(
+        self.session = session ?? URLSession(
             configuration: sessionConfiguration,
             delegate: NoRedirectURLSessionDelegate(),
             delegateQueue: nil
@@ -62,6 +63,7 @@ actor SonosAuthClient {
         )
 
         guard response.accessToken.isEmpty == false,
+              response.expiresAt > .now,
               response.tokenType.localizedCaseInsensitiveCompare("Bearer") == .orderedSame else {
             throw SonosAuthClientError.invalidTokenResponse
         }
@@ -74,6 +76,7 @@ actor SonosAuthClient {
         path: String,
         body: Body?
     ) async throws -> Response {
+        try throttle.check()
         guard configuration.baseURL.scheme == "https" else {
             throw SonosAuthClientError.insecureBaseURL
         }
@@ -99,10 +102,14 @@ actor SonosAuthClient {
             throw SonosAuthClientError.invalidResponse
         }
 
+        if httpResponse.statusCode == 429 {
+            throw throttle.recordLimit(httpResponse, data: data)
+        }
         guard 200..<300 ~= httpResponse.statusCode else {
             throw SonosAuthClientError.requestFailed(statusCode: httpResponse.statusCode)
         }
 
+        throttle.recordSuccess()
         do {
             return try decoder.decode(Response.self, from: data)
         } catch {
@@ -155,19 +162,35 @@ struct SonosBrokerTokenResponse: Decodable, Sendable {
     let accessToken: String
     let tokenType: String
     let expiresAt: Date
+    let brokerSessionId: String?
 
     private enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
         case tokenType = "token_type"
         case expiresAt = "expires_at"
+        case expiresIn = "expires_in"
+        case brokerSessionId = "broker_session_id"
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         accessToken = try container.decode(String.self, forKey: .accessToken)
         tokenType = try container.decode(String.self, forKey: .tokenType)
-        let timestamp = try container.decode(TimeInterval.self, forKey: .expiresAt)
-        expiresAt = Date(timeIntervalSince1970: timestamp)
+        if let timestamp = try container.decodeIfPresent(TimeInterval.self, forKey: .expiresAt) {
+            expiresAt = Date(timeIntervalSince1970: timestamp)
+        } else {
+            expiresAt = Date().addingTimeInterval(try container.decode(TimeInterval.self, forKey: .expiresIn))
+        }
+        brokerSessionId = try container.decodeIfPresent(String.self, forKey: .brokerSessionId)
+    }
+
+    func credentials(fallbackSessionId: String) -> SonosStoredCredentials {
+        let sessionId = brokerSessionId?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return SonosStoredCredentials(
+            brokerSessionId: sessionId.flatMap { $0.isEmpty ? nil : $0 } ?? fallbackSessionId,
+            accessToken: accessToken,
+            accessTokenExpiresAt: expiresAt
+        )
     }
 }
 

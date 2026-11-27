@@ -8,12 +8,15 @@ final class SonosState {
     private let tokenStore: SonosTokenStore
     private let oauthCoordinator: SonosOAuthCoordinator?
     private var liveVolumeTask: Task<Void, Never>?
+    private var playersLoadedAt: Date?
 
     private(set) var players: [SonosPlayer] = []
     var selectedPlayerID: SonosPlayer.ID?
     private(set) var isLoading = false
     private(set) var isAuthenticationRequired = false
     private(set) var errorMessage: String?
+    private(set) var rateLimitedUntil: Date?
+    var isPopoverOpen = false
 
     var authState: SonosAuthState {
         oauthCoordinator?.authState ?? (isAuthenticationRequired ? .disconnected : .connected)
@@ -47,11 +50,11 @@ final class SonosState {
 
     var canConnectSonos: Bool {
         switch authState {
-        case .disconnected, .failed, .offline, .notConfigured:
+        case .disconnected, .failed, .notConfigured:
             true
         case .connected:
             isAuthenticationRequired
-        case .checking, .openingBrowser, .waitingForAuthorization, .refreshing:
+        case .checking, .openingBrowser, .waitingForAuthorization, .refreshing, .offline:
             false
         }
     }
@@ -66,47 +69,34 @@ final class SonosState {
         self.oauthCoordinator = oauthCoordinator
     }
 
-    func start() async {
-        await oauthCoordinator?.prepareAtLaunch()
-
-        switch authState {
-        case .connected:
-            await loadPlayers()
-        case .checking, .notConfigured, .disconnected, .openingBrowser, .waitingForAuthorization, .refreshing, .failed, .offline:
-            break
-        }
-    }
-
     func loadPlayers() async {
+        guard !isLoading, !Task.isCancelled, !isWaitingForRateLimit else { return }
         isLoading = true
-        errorMessage = nil
+        defer { isLoading = false }
 
         do {
-            players = try await service.fetchPlayers()
+            try await oauthCoordinator?.restoreSession()
+            guard authState == .connected else { return }
+            let loadedPlayers = try await service.fetchPlayers()
+            try Task.checkCancellation()
+            players = loadedPlayers
+            playersLoadedAt = .now
             isAuthenticationRequired = false
+            clearRequestError()
             if !players.contains(where: { $0.id == selectedPlayerID }) {
                 selectedPlayerID = players.first?.id
             }
         } catch {
-            updateAuthenticationRequirement(for: error)
-            errorMessage = error.localizedDescription
-        }
-
-        isLoading = false
-    }
-
-    func reloadPlayers() async {
-        if players.isEmpty, !isAuthenticationRequired {
-            await start()
-        } else {
-            await loadPlayers()
+            recordRequestError(error)
         }
     }
 
     func connectSonos() {
         errorMessage = nil
         oauthCoordinator?.beginLogin { [weak self] in
-            await self?.loadPlayers()
+            guard let self else { return }
+            self.isAuthenticationRequired = false
+            await self.loadPlayers()
         }
     }
 
@@ -131,9 +121,11 @@ final class SonosState {
             }
 
             players = []
+            playersLoadedAt = nil
             selectedPlayerID = nil
             isAuthenticationRequired = true
             errorMessage = nil
+            rateLimitedUntil = nil
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -155,8 +147,7 @@ final class SonosState {
             replacePlayer(player)
         } catch {
             guard !Self.isCancellationError(error) else { return }
-            updateAuthenticationRequirement(for: error)
-            errorMessage = error.localizedDescription
+            recordRequestError(error)
         }
     }
 
@@ -179,23 +170,32 @@ final class SonosState {
             } catch {
                 guard !Self.isCancellationError(error) else { return }
                 guard let self else { return }
-                self.updateAuthenticationRequirement(for: error)
-                self.errorMessage = error.localizedDescription
+                self.recordRequestError(error)
             }
         }
     }
 
     func pollSelectedPlayerState() async {
+        guard isPopoverOpen else { return }
+        let needsRoomRefresh = playersLoadedAt.map { Date().timeIntervalSince($0) >= 300 } ?? true
+        if needsRoomRefresh, !isAuthenticationRequired, errorMessage == nil {
+            await loadPlayers()
+        }
         var pollCount = 0
 
-        while !Task.isCancelled {
-            if let player = selectedPlayer, !isAuthenticationRequired {
-                await refreshPlayerState(player, includingSource: pollCount % 4 == 0)
-                pollCount += 1
+        while isPopoverOpen, !Task.isCancelled {
+            if !isWaitingForRateLimit, !isLoading {
+                if let player = selectedPlayer, isConnected {
+                    await refreshPlayerState(player, includingSource: pollCount % 4 == 0)
+                    pollCount += 1
+                } else if !isAuthenticationRequired, authState == .offline || (authState == .connected && errorMessage != nil) {
+                    await loadPlayers()
+                }
             }
 
             do {
-                try await Task.sleep(for: .milliseconds(1500))
+                let retryDelay = rateLimitedUntil?.timeIntervalSinceNow ?? 0
+                try await Task.sleep(for: .seconds(min(86_400, max(6, retryDelay))))
             } catch {
                 break
             }
@@ -210,8 +210,7 @@ final class SonosState {
         do {
             replacePlayer(try await service.setMuted(isMuted, for: player.id))
         } catch {
-            updateAuthenticationRequirement(for: error)
-            errorMessage = error.localizedDescription
+            recordRequestError(error)
         }
     }
 
@@ -223,8 +222,7 @@ final class SonosState {
         do {
             replacePlayer(try await service.setEnhanceDialog(isEnabled, for: player.id))
         } catch {
-            updateAuthenticationRequirement(for: error)
-            errorMessage = error.localizedDescription
+            recordRequestError(error)
         }
     }
 
@@ -236,22 +234,31 @@ final class SonosState {
         do {
             replacePlayer(try await service.setNightMode(isEnabled, for: player.id))
         } catch {
-            updateAuthenticationRequirement(for: error)
-            errorMessage = error.localizedDescription
+            recordRequestError(error)
         }
     }
 
-    private func updateAuthenticationRequirement(for error: Error) {
-        guard let apiError = error as? SonosAPIError else { return }
+    private var isWaitingForRateLimit: Bool {
+        rateLimitedUntil.map { $0 > .now } ?? false
+    }
 
-        switch apiError {
-        case .credentialsRequired:
+    private func recordRequestError(_ error: Error) {
+        guard !Self.isCancellationError(error), !Task.isCancelled else { return }
+        if case SonosAPIError.credentialsRequired = error {
             isAuthenticationRequired = true
-        case let .requestFailed(statusCode, _) where statusCode == 401 || statusCode == 403:
-            isAuthenticationRequired = true
-        default:
-            break
         }
+        if let limited = error as? SonosRateLimited {
+            rateLimitedUntil = max(rateLimitedUntil ?? .now, limited.retryAt)
+        } else {
+            if !isWaitingForRateLimit { rateLimitedUntil = nil }
+        }
+        errorMessage = error.localizedDescription
+    }
+
+    private func clearRequestError() {
+        guard !isWaitingForRateLimit else { return }
+        rateLimitedUntil = nil
+        errorMessage = nil
     }
 
     private func refreshPlayerState(_ player: SonosPlayer, includingSource: Bool) async {
@@ -259,14 +266,14 @@ final class SonosState {
             replacePlayer(try await service.refreshPlayerState(player, includingSource: includingSource))
         } catch {
             guard !Self.isCancellationError(error) else { return }
-            updateAuthenticationRequirement(for: error)
-            errorMessage = error.localizedDescription
+            recordRequestError(error)
         }
     }
 
     private func replacePlayer(_ player: SonosPlayer) {
         guard let index = players.firstIndex(where: { $0.id == player.id }) else { return }
         players[index] = player
+        clearRequestError()
     }
 
     private func updateSelectedPlayer(_ update: (inout SonosPlayer) -> Void) {

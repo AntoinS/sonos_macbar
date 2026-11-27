@@ -130,8 +130,16 @@ Return:
 }
 ```
 
-The app is tolerant of a missing `broker_session_id`, but providing one lets
-the app refresh later without restarting OAuth.
+The app accepts `expires_in` in seconds or `expires_at` as a Unix timestamp.
+If the response includes a `broker_session_id`, the app saves it and sends
+it as `login_id` for subsequent requests. Otherwise it uses the original ID.
+
+Keep the authorized session and its Sonos refresh token available after the
+browser login window expires and across server restarts. When the access token
+expires, use the stored refresh token and persist any replacement returned by
+Sonos. Return `401`, `404`, or `410` when the session is invalid or gone.
+Use `429` with `Retry-After` for throttling and a `5xx` response for temporary
+service failures so the app can retry with the stored session.
 
 ## Manual Checks
 

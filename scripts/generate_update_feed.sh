@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${SONOS_MACBAR_VERSION:-0.2.3}"
+VERSION="${SONOS_MACBAR_VERSION:-0.2.4}"
 DIST_DIR="${SONOS_MACBAR_DIST_DIR:-dist}"
 SCRATCH_DIR="${TMPDIR:-/tmp}/sonos_macbar-swiftpm-build"
 TOOLS_DIR="${SCRATCH_DIR}/artifacts/sparkle/Sparkle/bin"
