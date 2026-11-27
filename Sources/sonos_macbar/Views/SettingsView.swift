@@ -53,7 +53,7 @@ struct SettingsView: View {
                     Text(connectionLabel)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .help(state.rateLimitedUntil != nil ? language.sonosRateLimited : state.errorMessage ?? state.authState.userMessage(for: language))
+                        .help(connectionHelp)
                 }
             }
 
@@ -76,10 +76,11 @@ struct SettingsView: View {
                             Label(language.connectSonos, systemImage: "link")
                         }
                     }
-                } else if canDisconnect || state.authState == .offline {
+                } else if canDisconnect || state.authState == .sessionUnavailable {
                     iconButton(language.reloadRooms, symbol: "arrow.clockwise") {
                         Task { await state.loadPlayers() }
                     }
+                    .disabled(state.isWaitingForRateLimit)
                 }
                 if canDisconnect {
                     iconButton(language.disconnectConnection, symbol: "rectangle.portrait.and.arrow.right") {
@@ -161,7 +162,7 @@ struct SettingsView: View {
 
     private var connectionLabel: String {
         switch state.authState {
-        case .connected:
+        case .connected, .sessionUnavailable:
             state.connectionStatus(for: language)
         case .disconnected:
             language.notConnected
@@ -169,11 +170,14 @@ struct SettingsView: View {
             language.loading
         case .openingBrowser, .waitingForAuthorization:
             language.browserLogin
-        case .offline:
-            "Offline"
         case .notConfigured, .failed:
             language.connectionTitle(for: state.authState)
         }
+    }
+
+    private var connectionHelp: String {
+        if let issue = state.connectionIssue { return language.connectionIssueMessage(for: issue) }
+        return state.errorMessage ?? state.authState.userMessage(for: language)
     }
 
     private var rowDivider: some View {

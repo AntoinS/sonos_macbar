@@ -8,10 +8,16 @@ enum SonosAuthState: Equatable {
     case waitingForAuthorization
     case connected
     case refreshing
-    case offline
+    case sessionUnavailable
     case failed(message: String)
 
     func userMessage(for language: AppLanguage) -> String {
         language.authMessage(for: self)
     }
+}
+
+enum SonosConnectionIssue: Equatable {
+    case rateLimited(retryAt: Date)
+    case sessionUnavailable
+    case cloudRequestFailed
 }

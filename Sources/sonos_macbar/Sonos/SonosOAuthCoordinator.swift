@@ -25,7 +25,7 @@ final class SonosOAuthCoordinator {
     }
 
     func restoreSession() async throws {
-        guard loginTask == nil, authState == .checking || authState == .offline else { return }
+        guard loginTask == nil, authState == .checking || authState == .sessionUnavailable else { return }
         do {
             if let auth {
                 _ = try await auth.accessToken()
@@ -37,7 +37,7 @@ final class SonosOAuthCoordinator {
         } catch SonosAPIError.credentialsRequired {
             authState = .disconnected
         } catch {
-            if !Task.isCancelled { authState = .offline }
+            if !Task.isCancelled { authState = .sessionUnavailable }
             throw error
         }
     }

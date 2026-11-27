@@ -9,6 +9,7 @@ final class SonosState {
     private let oauthCoordinator: SonosOAuthCoordinator?
     private var liveVolumeTask: Task<Void, Never>?
     private var playersLoadedAt: Date?
+    private var polling = SonosPollingSchedule()
 
     private(set) var players: [SonosPlayer] = []
     var selectedPlayerID: SonosPlayer.ID?
@@ -26,9 +27,18 @@ final class SonosState {
         authState == .connected && !isAuthenticationRequired
     }
 
+    var connectionIssue: SonosConnectionIssue? {
+        guard !isAuthenticationRequired, authState == .connected || authState == .sessionUnavailable else {
+            return nil
+        }
+        if let rateLimitedUntil { return .rateLimited(retryAt: rateLimitedUntil) }
+        if authState == .sessionUnavailable { return .sessionUnavailable }
+        return errorMessage == nil ? nil : .cloudRequestFailed
+    }
+
     var showsConnectionView: Bool {
         switch authState {
-        case .checking, .notConfigured, .disconnected, .openingBrowser, .waitingForAuthorization, .refreshing, .offline, .failed:
+        case .checking, .notConfigured, .disconnected, .openingBrowser, .waitingForAuthorization, .refreshing, .sessionUnavailable, .failed:
             true
         case .connected:
             isAuthenticationRequired || (players.isEmpty && errorMessage != nil)
@@ -41,10 +51,10 @@ final class SonosState {
     }
 
     func connectionStatus(for language: AppLanguage) -> String {
-        language.connectionStatus(
+        if let connectionIssue { return language.connectionIssueTitle(for: connectionIssue) }
+        return language.connectionStatus(
             isLoading: isLoading,
-            isAuthenticationRequired: isAuthenticationRequired,
-            hasError: errorMessage != nil
+            isAuthenticationRequired: isAuthenticationRequired
         )
     }
 
@@ -54,7 +64,7 @@ final class SonosState {
             true
         case .connected:
             isAuthenticationRequired
-        case .checking, .openingBrowser, .waitingForAuthorization, .refreshing, .offline:
+        case .checking, .openingBrowser, .waitingForAuthorization, .refreshing, .sessionUnavailable:
             false
         }
     }
@@ -73,6 +83,7 @@ final class SonosState {
         guard !isLoading, !Task.isCancelled, !isWaitingForRateLimit else { return }
         isLoading = true
         defer { isLoading = false }
+        polling.beginRoomRefresh(at: .now)
 
         do {
             try await oauthCoordinator?.restoreSession()
@@ -122,6 +133,7 @@ final class SonosState {
 
             players = []
             playersLoadedAt = nil
+            polling = SonosPollingSchedule()
             selectedPlayerID = nil
             isAuthenticationRequired = true
             errorMessage = nil
@@ -160,7 +172,7 @@ final class SonosState {
         liveVolumeTask?.cancel()
         liveVolumeTask = Task { [weak self] in
             do {
-                try await Task.sleep(for: .milliseconds(120))
+                try await Task.sleep(for: .milliseconds(350))
                 guard let self else { return }
                 let player = try await self.service.setVolume(clampedVolume, for: playerID)
                 try Task.checkCancellation()
@@ -177,25 +189,25 @@ final class SonosState {
 
     func pollSelectedPlayerState() async {
         guard isPopoverOpen else { return }
-        let needsRoomRefresh = playersLoadedAt.map { Date().timeIntervalSince($0) >= 300 } ?? true
-        if needsRoomRefresh, !isAuthenticationRequired, errorMessage == nil {
-            await loadPlayers()
-        }
-        var pollCount = 0
+        var needsRoomRefresh = playersLoadedAt.map { Date().timeIntervalSince($0) >= 300 } ?? true
 
         while isPopoverOpen, !Task.isCancelled {
-            if !isWaitingForRateLimit, !isLoading {
-                if let player = selectedPlayer, isConnected {
-                    await refreshPlayerState(player, includingSource: pollCount % 4 == 0)
-                    pollCount += 1
-                } else if !isAuthenticationRequired, authState == .offline || (authState == .connected && errorMessage != nil) {
+            if !isWaitingForRateLimit, !isLoading, polling.timeUntilNextRead(at: .now) == .zero {
+                if !isAuthenticationRequired,
+                   (needsRoomRefresh && errorMessage == nil) || (selectedPlayer == nil && connectionIssue != nil) {
+                    needsRoomRefresh = false
                     await loadPlayers()
+                } else if let player = selectedPlayer, isConnected {
+                    let includeSource = polling.beginPlayerRefresh(at: .now)
+                    await refreshPlayerState(player, includingSource: includeSource)
                 }
             }
 
             do {
                 let retryDelay = rateLimitedUntil?.timeIntervalSinceNow ?? 0
-                try await Task.sleep(for: .seconds(min(86_400, max(6, retryDelay))))
+                let pollDelay = polling.timeUntilNextRead(at: .now)
+                let wait = pollDelay > .zero ? pollDelay : SonosPollingSchedule.volumeInterval
+                try await Task.sleep(for: max(wait, .seconds(min(86_400, max(0, retryDelay)))))
             } catch {
                 break
             }
@@ -238,7 +250,7 @@ final class SonosState {
         }
     }
 
-    private var isWaitingForRateLimit: Bool {
+    var isWaitingForRateLimit: Bool {
         rateLimitedUntil.map { $0 > .now } ?? false
     }
 
@@ -293,5 +305,29 @@ final class SonosState {
         }
 
         return (error as? URLError)?.code == .cancelled
+    }
+}
+
+struct SonosPollingSchedule {
+    static let volumeInterval: Duration = .seconds(15)
+    static let sourceInterval: Duration = .seconds(60)
+
+    private var nextRead: ContinuousClock.Instant?
+    private var nextSourceRead: ContinuousClock.Instant?
+
+    func timeUntilNextRead(at now: ContinuousClock.Instant) -> Duration {
+        max(.zero, now.duration(to: nextRead ?? now))
+    }
+
+    mutating func beginRoomRefresh(at now: ContinuousClock.Instant) {
+        nextRead = now.advanced(by: Self.volumeInterval)
+        nextSourceRead = now.advanced(by: Self.sourceInterval)
+    }
+
+    mutating func beginPlayerRefresh(at now: ContinuousClock.Instant) -> Bool {
+        nextRead = now.advanced(by: Self.volumeInterval)
+        guard nextSourceRead.map({ now >= $0 }) ?? true else { return false }
+        nextSourceRead = now.advanced(by: Self.sourceInterval)
+        return true
     }
 }

@@ -66,8 +66,14 @@ struct ControlPanelView: View {
                         }
                     }
 
-                    if let errorMessage = state.errorMessage, state.rateLimitedUntil == nil || state.selectedPlayer != nil {
-                        Text(state.rateLimitedUntil == nil ? errorMessage : appLanguage.sonosRateLimited)
+                    if let issue = state.connectionIssue, state.selectedPlayer != nil {
+                        Label(appLanguage.connectionIssueMessage(for: issue), systemImage: "exclamationmark.circle")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 4)
+                    } else if let errorMessage = state.errorMessage, state.rateLimitedUntil == nil {
+                        Text(errorMessage)
                             .font(.footnote)
                             .foregroundStyle(.red)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -141,7 +147,7 @@ private struct SonosConnectionView: View {
                 }
                 .buttonStyle(.borderless)
 
-            case .offline, .failed:
+            case .sessionUnavailable, .connected, .failed:
                 Button {
                     if case .failed = connectionState {
                         state.connectSonos()
@@ -154,6 +160,7 @@ private struct SonosConnectionView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
+                .disabled(state.isLoading || state.isWaitingForRateLimit)
 
             case .notConfigured, .checking, .refreshing:
                 EmptyView()
@@ -172,22 +179,23 @@ private struct SonosConnectionView: View {
     }
 
     private var title: String {
-        language.connectionTitle(for: connectionState)
+        if let issue = state.connectionIssue { return language.connectionIssueTitle(for: issue) }
+        return language.connectionTitle(for: connectionState)
     }
 
     private var message: String {
-        state.rateLimitedUntil == nil ? language.connectionMessage(for: connectionState) : language.sonosRateLimited
+        if let issue = state.connectionIssue { return language.connectionIssueMessage(for: issue) }
+        return language.connectionMessage(for: connectionState)
     }
 
     private var connectionState: SonosAuthState {
-        guard state.authState == .connected else { return state.authState }
-        if state.isAuthenticationRequired { return .disconnected }
-        return state.errorMessage == nil ? .connected : .offline
+        if state.authState == .connected, state.isAuthenticationRequired { return .disconnected }
+        return state.authState
     }
 
     private var iconName: String {
         switch connectionState {
-        case .offline, .failed:
+        case .sessionUnavailable, .connected, .failed:
             "wifi.exclamationmark"
         case .openingBrowser, .waitingForAuthorization:
             "safari.fill"

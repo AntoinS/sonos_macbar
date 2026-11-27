@@ -5,6 +5,24 @@ import os
 
 @Suite(.serialized)
 struct SonosConnectionTests {
+    @Test func pollingKeepsItsCooldownAcrossPopoverReopens() {
+        var polling = SonosPollingSchedule()
+        let now = ContinuousClock.now
+        #expect(polling.timeUntilNextRead(at: now) == .zero)
+        polling.beginRoomRefresh(at: now)
+        #expect(polling.timeUntilNextRead(at: now.advanced(by: .seconds(3))) == .seconds(12))
+
+        for seconds in [15, 30, 45] {
+            let time = now.advanced(by: .seconds(seconds))
+            #expect(polling.timeUntilNextRead(at: time) == .zero)
+            let includeSource = polling.beginPlayerRefresh(at: time)
+            #expect(!includeSource)
+        }
+        let includeSource = polling.beginPlayerRefresh(at: now.advanced(by: .seconds(60)))
+        #expect(includeSource)
+        #expect(polling.timeUntilNextRead(at: now.advanced(by: .seconds(61))) == .seconds(14))
+    }
+
     @Test func retryAfterAppliesToOtherRequestsUntilDeadline() throws {
         var throttle = SonosRequestThrottle()
         let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -71,8 +89,9 @@ struct SonosConnectionTests {
             let state = SonosState(service: service, tokenStore: store, oauthCoordinator: coordinator)
 
             await state.loadPlayers()
-            #expect(state.authState == .offline)
-            #expect(state.rateLimitedUntil != nil)
+            #expect(state.authState == .sessionUnavailable)
+            let retryAt = try #require(state.rateLimitedUntil)
+            #expect(state.connectionIssue == .rateLimited(retryAt: retryAt))
             #expect(!state.canConnectSonos)
             #expect(try await store.savedCredentials()?.brokerSessionId == "old-session")
 
@@ -104,11 +123,36 @@ struct SonosConnectionTests {
             #expect(state.isConnected)
             #expect(state.showsConnectionView)
             #expect(!state.canConnectSonos)
-            #expect(state.rateLimitedUntil != nil)
+            let retryAt = try #require(state.rateLimitedUntil)
+            #expect(state.connectionIssue == .rateLimited(retryAt: retryAt))
+            #expect(state.connectionStatus(for: .german) == "Sonos-Anfragelimit (429)")
             await #expect(throws: SonosRateLimited.self) {
                 _ = try await service.fetchPlayers()
             }
             #expect(StubSonosHTTP.requestCount == 2)
+        }
+    }
+
+    @Test @MainActor func cloudFailureHasItsOwnStatus() async throws {
+        try await withExpiredCredentials { store in
+            StubSonosHTTP.reset([
+                .init(status: 200, body: #"{"access_token":"fresh","expires_in":86400,"token_type":"Bearer"}"#),
+                .init(status: 503)
+            ])
+            let session = StubSonosHTTP.session()
+            let client = SonosAuthClient(session: session)
+            let auth = SonosAuth(authClient: client, tokenStore: store)
+            let coordinator = SonosOAuthCoordinator(authClient: client, tokenStore: store, auth: auth)
+            let state = SonosState(
+                service: SonosService(auth: auth, session: session),
+                tokenStore: store,
+                oauthCoordinator: coordinator
+            )
+
+            await state.loadPlayers()
+            #expect(state.isConnected)
+            #expect(state.connectionIssue == .cloudRequestFailed)
+            #expect(state.connectionStatus(for: .german) == "Cloud-Steuerung gestört")
         }
     }
 

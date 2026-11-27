@@ -190,10 +190,35 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         }
     }
 
-    var sonosRateLimited: String {
-        isGerman
-            ? "Sonos erhält gerade zu viele Anfragen. Die App versucht es automatisch erneut."
-            : "Sonos is receiving too many requests. The app will retry automatically."
+    func connectionIssueTitle(for issue: SonosConnectionIssue) -> String {
+        switch issue {
+        case .rateLimited:
+            isGerman ? "Sonos-Anfragelimit (429)" : "Sonos Rate Limit (429)"
+        case .sessionUnavailable:
+            isGerman ? "Sitzungsprüfung fehlgeschlagen" : "Session Check Failed"
+        case .cloudRequestFailed:
+            isGerman ? "Cloud-Steuerung gestört" : "Cloud Control Unavailable"
+        }
+    }
+
+    func connectionIssueMessage(for issue: SonosConnectionIssue) -> String {
+        switch issue {
+        case let .rateLimited(retryAt):
+            let date = retryAt.formatted(
+                Date.FormatStyle(date: .abbreviated, time: .shortened, locale: Locale(identifier: isGerman ? "de_DE" : "en_US"))
+            )
+            return isGerman
+                ? "Sonos begrenzt die Steueranfragen. Nächster Versuch ab \(date)."
+                : "Sonos is limiting control requests. Next attempt from \(date)."
+        case .sessionUnavailable:
+            return isGerman
+                ? "Die gespeicherte Anmeldung wird automatisch erneut geprüft."
+                : "Your saved sign-in will be checked again automatically."
+        case .cloudRequestFailed:
+            return isGerman
+                ? "Die letzte Anfrage an die Sonos-Cloud ist fehlgeschlagen."
+                : "The latest request to the Sonos cloud failed."
+        }
     }
 
     var reopenBrowser: String {
@@ -290,7 +315,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         }
     }
 
-    func connectionStatus(isLoading: Bool, isAuthenticationRequired: Bool, hasError: Bool) -> String {
+    func connectionStatus(isLoading: Bool, isAuthenticationRequired: Bool) -> String {
         if isLoading {
             switch self {
             case .english:
@@ -302,10 +327,6 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 
         if isAuthenticationRequired {
             return notConnected
-        }
-
-        if hasError {
-            return "Offline"
         }
 
         switch self {
@@ -367,13 +388,8 @@ enum AppLanguage: String, CaseIterable, Identifiable {
             case .german:
                 return "Sonos-Verbindung wird erneuert."
             }
-        case .offline:
-            switch self {
-            case .english:
-                return "Sonos is currently unavailable."
-            case .german:
-                return "Sonos ist gerade nicht erreichbar."
-            }
+        case .sessionUnavailable:
+            return connectionIssueMessage(for: .sessionUnavailable)
         case let .failed(message):
             return message
         }
@@ -402,13 +418,8 @@ enum AppLanguage: String, CaseIterable, Identifiable {
             case .german:
                 return "Anmeldung im Browser abschließen"
             }
-        case .offline:
-            switch self {
-            case .english:
-                return "Sonos Is Currently Unavailable"
-            case .german:
-                return "Sonos ist gerade nicht erreichbar"
-            }
+        case .sessionUnavailable:
+            return connectionIssueTitle(for: .sessionUnavailable)
         case .failed:
             switch self {
             case .english:
@@ -442,13 +453,8 @@ enum AppLanguage: String, CaseIterable, Identifiable {
             case .german:
                 return "Melde dich bei Sonos an und erlaube den Zugriff."
             }
-        case .offline:
-            switch self {
-            case .english:
-                return "The connection will be retried automatically."
-            case .german:
-                return "Die Verbindung wird automatisch erneut versucht."
-            }
+        case .sessionUnavailable:
+            return connectionIssueMessage(for: .sessionUnavailable)
         case let .failed(message):
             return message
         default:
