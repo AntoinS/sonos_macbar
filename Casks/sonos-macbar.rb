@@ -1,6 +1,6 @@
 cask "sonos-macbar" do
-  version "0.2.6"
-  sha256 "2172b08dc1cf7d1345f3b46311fb99d27cfdd32c9441331ac66867cd3841250c"
+  version "0.2.7"
+  sha256 "cf50c39636f5ff352eaaa71fba77688eff625d56e5d55370724be6501bddf328"
 
   url "https://github.com/AntoinS/sonos_macbar/releases/download/v#{version}/Sonos-Macbar-#{version}.zip"
   name "Sonos Macbar"
