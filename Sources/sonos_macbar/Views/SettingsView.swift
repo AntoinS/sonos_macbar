@@ -4,6 +4,7 @@ struct SettingsView: View {
     @Bindable var state: SonosState
     let language: AppLanguage
     @Binding var appLanguageRawValue: String
+    @Binding var connectionMode: SonosConnectionMode
     let closeAction: () -> Void
 
     @State private var isConfirmingDisconnect = false
@@ -15,6 +16,8 @@ struct SettingsView: View {
 
             PanelCard {
                 VStack(spacing: 0) {
+                    connectionModeRow.padding(10)
+                    rowDivider
                     connectionRow.padding(10)
 
                     if !state.players.isEmpty || (state.isConnected && !state.isLoading) {
@@ -36,6 +39,9 @@ struct SettingsView: View {
                     AppUpdateView(language: language).padding(10)
                 }
             }
+        }
+        .onChange(of: connectionMode) { _, _ in
+            isConfirmingDisconnect = false
         }
     }
 
@@ -59,7 +65,7 @@ struct SettingsView: View {
 
             Spacer(minLength: 4)
 
-            if isDisconnecting || (state.isLoading && canDisconnect) {
+            if isDisconnecting || state.isLoading {
                 ProgressView()
                     .controlSize(.small)
                     .frame(width: 24)
@@ -76,7 +82,7 @@ struct SettingsView: View {
                             Label(language.connectSonos, systemImage: "link")
                         }
                     }
-                } else if canDisconnect || state.authState == .sessionUnavailable {
+                } else if state.connectionMode == .local || canDisconnect || state.authState == .sessionUnavailable {
                     iconButton(language.reloadRooms, symbol: "arrow.clockwise") {
                         Task { await state.loadPlayers() }
                     }
@@ -90,6 +96,23 @@ struct SettingsView: View {
             }
         }
         .buttonStyle(.bordered)
+        .controlSize(.small)
+    }
+
+    private var connectionModeRow: some View {
+        HStack(spacing: 8) {
+            PanelIcon("network", tint: .blue)
+            Text(language.controlMode)
+            Spacer()
+            Picker(language.controlMode, selection: $connectionMode) {
+                Text(language.localMode).tag(SonosConnectionMode.local)
+                Text("Cloud").tag(SonosConnectionMode.cloud)
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(width: 132)
+        }
+        .font(.callout)
         .controlSize(.small)
     }
 
@@ -157,7 +180,7 @@ struct SettingsView: View {
     }
 
     private var canDisconnect: Bool {
-        state.isConnected || !state.players.isEmpty
+        state.connectionMode == .cloud && (state.isConnected || !state.players.isEmpty)
     }
 
     private var connectionLabel: String {
@@ -177,6 +200,7 @@ struct SettingsView: View {
 
     private var connectionHelp: String {
         if let issue = state.connectionIssue { return language.connectionIssueMessage(for: issue) }
+        if state.connectionMode == .local { return language.localNetworkHelp }
         return state.errorMessage ?? state.authState.userMessage(for: language)
     }
 

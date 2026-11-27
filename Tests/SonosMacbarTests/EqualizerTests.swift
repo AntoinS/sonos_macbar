@@ -12,11 +12,11 @@ struct EqualizerTests {
             USN: uuid:RINCON_BEAM::urn:schemas-upnp-org:device:ZonePlayer:1
             """
         let response = try #require(SSDPResponse(message: message, sourceAddress: "192.168.1.12"))
-        #expect(SonosEqualizerService.matches(response, playerID: "RINCON_BEAM"))
-        #expect(!SonosEqualizerService.matches(response, playerID: "RINCON_OTHER"))
+        #expect(SonosLocalDiscovery.matches(response, playerID: "RINCON_BEAM"))
+        #expect(!SonosLocalDiscovery.matches(response, playerID: "RINCON_OTHER"))
 
         let mismatchedAddress = try #require(SSDPResponse(message: message, sourceAddress: "192.168.1.13"))
-        #expect(!SonosEqualizerService.matches(mismatchedAddress, playerID: "RINCON_BEAM"))
+        #expect(!SonosLocalDiscovery.matches(mismatchedAddress, playerID: "RINCON_BEAM"))
     }
 
     @Test func subBelongsToSelectedRoom() {
@@ -36,10 +36,10 @@ struct EqualizerTests {
     @Test func bonjourUsesOnlyTheSelectedDevicesDescription() {
         let description = "http://192.168.1.12:1400/xml/device_description.xml"
         let record = NWTXTRecord(["uuid": "RINCON_BEAM", "location": description])
-        #expect(SonosEqualizerService.bonjourLocation(in: record, for: "RINCON_BEAM")?.absoluteString == description)
-        #expect(SonosEqualizerService.bonjourLocation(in: record, for: "RINCON_OTHER") == nil)
+        #expect(SonosLocalDiscovery.bonjourLocation(in: record, for: "RINCON_BEAM")?.absoluteString == description)
+        #expect(SonosLocalDiscovery.bonjourLocation(in: record, for: "RINCON_OTHER") == nil)
         let wrongPort = NWTXTRecord(["uuid": "RINCON_BEAM", "location": "http://192.168.1.12:1443/xml/device_description.xml"])
-        #expect(SonosEqualizerService.bonjourLocation(in: wrongPort, for: "RINCON_BEAM") == nil)
+        #expect(SonosLocalDiscovery.bonjourLocation(in: wrongPort, for: "RINCON_BEAM") == nil)
     }
 
     @Test func commandValuesUseEachControlsRange() throws {

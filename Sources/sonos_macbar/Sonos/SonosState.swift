@@ -4,12 +4,20 @@ import Observation
 @MainActor
 @Observable
 final class SonosState {
+    let connectionMode: SonosConnectionMode
     private let service: any SonosAPI
     private let tokenStore: SonosTokenStore
     private let oauthCoordinator: SonosOAuthCoordinator?
     private var liveVolumeTask: Task<Void, Never>?
+    private var pendingLocalVolume: VolumeChange?
     private var playersLoadedAt: Date?
-    private var polling = SonosPollingSchedule()
+    private var roomSearchStartedAt: ContinuousClock.Instant?
+    private var polling: SonosPollingSchedule
+
+    private struct VolumeChange: Equatable {
+        let playerID: SonosPlayer.ID
+        let volume: Int
+    }
 
     private(set) var players: [SonosPlayer] = []
     var selectedPlayerID: SonosPlayer.ID?
@@ -24,7 +32,8 @@ final class SonosState {
     }
 
     var isConnected: Bool {
-        authState == .connected && !isAuthenticationRequired
+        if connectionMode == .local { return !players.isEmpty }
+        return authState == .connected && !isAuthenticationRequired
     }
 
     var connectionIssue: SonosConnectionIssue? {
@@ -33,11 +42,13 @@ final class SonosState {
         }
         if let rateLimitedUntil { return .rateLimited(retryAt: rateLimitedUntil) }
         if authState == .sessionUnavailable { return .sessionUnavailable }
-        return errorMessage == nil ? nil : .cloudRequestFailed
+        guard errorMessage != nil else { return nil }
+        return connectionMode == .local ? .localRequestFailed : .cloudRequestFailed
     }
 
     var showsConnectionView: Bool {
-        switch authState {
+        if connectionMode == .local { return players.isEmpty }
+        return switch authState {
         case .checking, .notConfigured, .disconnected, .openingBrowser, .waitingForAuthorization, .refreshing, .sessionUnavailable, .failed:
             true
         case .connected:
@@ -52,6 +63,10 @@ final class SonosState {
 
     func connectionStatus(for language: AppLanguage) -> String {
         if let connectionIssue { return language.connectionIssueTitle(for: connectionIssue) }
+        if connectionMode == .local {
+            if isLoading { return language.searchingLocalRooms }
+            return isConnected ? language.connectedLocally : language.noRoom
+        }
         return language.connectionStatus(
             isLoading: isLoading,
             isAuthenticationRequired: isAuthenticationRequired
@@ -59,7 +74,8 @@ final class SonosState {
     }
 
     var canConnectSonos: Bool {
-        switch authState {
+        guard connectionMode == .cloud else { return false }
+        return switch authState {
         case .disconnected, .failed, .notConfigured:
             true
         case .connected:
@@ -71,10 +87,13 @@ final class SonosState {
 
     init(
         service: any SonosAPI,
+        connectionMode: SonosConnectionMode = .cloud,
         tokenStore: SonosTokenStore = SonosTokenStore(),
         oauthCoordinator: SonosOAuthCoordinator? = nil
     ) {
         self.service = service
+        self.connectionMode = connectionMode
+        self.polling = SonosPollingSchedule(mode: connectionMode)
         self.tokenStore = tokenStore
         self.oauthCoordinator = oauthCoordinator
     }
@@ -83,6 +102,7 @@ final class SonosState {
         guard !isLoading, !Task.isCancelled, !isWaitingForRateLimit else { return }
         isLoading = true
         defer { isLoading = false }
+        roomSearchStartedAt = .now
         polling.beginRoomRefresh(at: .now)
 
         do {
@@ -103,6 +123,7 @@ final class SonosState {
     }
 
     func connectSonos() {
+        guard connectionMode == .cloud else { return }
         errorMessage = nil
         oauthCoordinator?.beginLogin { [weak self] in
             guard let self else { return }
@@ -124,6 +145,7 @@ final class SonosState {
     }
 
     func disconnectSonos() async {
+        guard connectionMode == .cloud else { return }
         do {
             if let oauthCoordinator {
                 try await oauthCoordinator.disconnect()
@@ -133,7 +155,7 @@ final class SonosState {
 
             players = []
             playersLoadedAt = nil
-            polling = SonosPollingSchedule()
+            polling = SonosPollingSchedule(mode: connectionMode)
             selectedPlayerID = nil
             isAuthenticationRequired = true
             errorMessage = nil
@@ -151,8 +173,13 @@ final class SonosState {
     }
 
     func commitVolume(_ volume: Int) async {
-        liveVolumeTask?.cancel()
         guard let playerID = selectedPlayer?.id else { return }
+        if connectionMode == .local {
+            enqueueLocalVolume(Self.clampedVolume(volume), playerID: playerID)
+            await liveVolumeTask?.value
+            return
+        }
+        liveVolumeTask?.cancel()
 
         do {
             let player = try await service.setVolume(Self.clampedVolume(volume), for: playerID)
@@ -168,6 +195,10 @@ final class SonosState {
         previewVolume(clampedVolume)
 
         guard let playerID = selectedPlayer?.id else { return }
+        if connectionMode == .local {
+            enqueueLocalVolume(clampedVolume, playerID: playerID)
+            return
+        }
 
         liveVolumeTask?.cancel()
         liveVolumeTask = Task { [weak self] in
@@ -187,14 +218,41 @@ final class SonosState {
         }
     }
 
+    func cancelPendingVolumeUpdate() {
+        pendingLocalVolume = nil
+        if connectionMode == .cloud { liveVolumeTask?.cancel() }
+    }
+
+    private func enqueueLocalVolume(_ volume: Int, playerID: SonosPlayer.ID) {
+        pendingLocalVolume = VolumeChange(playerID: playerID, volume: volume)
+        guard liveVolumeTask == nil else { return }
+        liveVolumeTask = Task { [weak self] in
+            await self?.sendLocalVolumeChanges()
+        }
+    }
+
+    private func sendLocalVolumeChanges() async {
+        defer { liveVolumeTask = nil }
+        while let change = pendingLocalVolume {
+            pendingLocalVolume = nil
+            do {
+                let player = try await service.setVolume(change.volume, for: change.playerID)
+                if pendingLocalVolume == change { pendingLocalVolume = nil }
+                if pendingLocalVolume == nil { replacePlayer(player) }
+            } catch {
+                recordRequestError(error)
+            }
+            try? await Task.sleep(for: .milliseconds(80))
+        }
+    }
+
     func pollSelectedPlayerState() async {
         guard isPopoverOpen else { return }
         var needsRoomRefresh = playersLoadedAt.map { Date().timeIntervalSince($0) >= 300 } ?? true
 
         while isPopoverOpen, !Task.isCancelled {
             if !isWaitingForRateLimit, !isLoading, polling.timeUntilNextRead(at: .now) == .zero {
-                if !isAuthenticationRequired,
-                   (needsRoomRefresh && errorMessage == nil) || (selectedPlayer == nil && connectionIssue != nil) {
+                if !isAuthenticationRequired, (needsRoomRefresh && errorMessage == nil) || shouldRetryRoomSearch {
                     needsRoomRefresh = false
                     await loadPlayers()
                 } else if let player = selectedPlayer, isConnected {
@@ -206,12 +264,18 @@ final class SonosState {
             do {
                 let retryDelay = rateLimitedUntil?.timeIntervalSinceNow ?? 0
                 let pollDelay = polling.timeUntilNextRead(at: .now)
-                let wait = pollDelay > .zero ? pollDelay : SonosPollingSchedule.volumeInterval
+                let wait = pollDelay > .zero ? pollDelay : polling.volumeInterval
                 try await Task.sleep(for: max(wait, .seconds(min(86_400, max(0, retryDelay)))))
             } catch {
                 break
             }
         }
+    }
+
+    private var shouldRetryRoomSearch: Bool {
+        guard connectionIssue != nil else { return false }
+        if connectionMode == .cloud { return selectedPlayer == nil }
+        return roomSearchStartedAt.map { $0.duration(to: .now) >= .seconds(5) } ?? true
     }
 
     func setMuted(_ isMuted: Bool) async {
@@ -309,25 +373,30 @@ final class SonosState {
 }
 
 struct SonosPollingSchedule {
-    static let volumeInterval: Duration = .seconds(15)
-    static let sourceInterval: Duration = .seconds(60)
+    var volumeInterval: Duration { mode == .local ? .milliseconds(500) : .seconds(15) }
+    private var sourceInterval: Duration { mode == .local ? .seconds(2) : .seconds(60) }
 
+    private let mode: SonosConnectionMode
     private var nextRead: ContinuousClock.Instant?
     private var nextSourceRead: ContinuousClock.Instant?
+
+    init(mode: SonosConnectionMode = .cloud) {
+        self.mode = mode
+    }
 
     func timeUntilNextRead(at now: ContinuousClock.Instant) -> Duration {
         max(.zero, now.duration(to: nextRead ?? now))
     }
 
     mutating func beginRoomRefresh(at now: ContinuousClock.Instant) {
-        nextRead = now.advanced(by: Self.volumeInterval)
-        nextSourceRead = now.advanced(by: Self.sourceInterval)
+        nextRead = now.advanced(by: volumeInterval)
+        nextSourceRead = now.advanced(by: sourceInterval)
     }
 
     mutating func beginPlayerRefresh(at now: ContinuousClock.Instant) -> Bool {
-        nextRead = now.advanced(by: Self.volumeInterval)
+        nextRead = now.advanced(by: volumeInterval)
         guard nextSourceRead.map({ now >= $0 }) ?? true else { return false }
-        nextSourceRead = now.advanced(by: Self.sourceInterval)
+        nextSourceRead = now.advanced(by: sourceInterval)
         return true
     }
 }

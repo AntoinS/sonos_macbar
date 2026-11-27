@@ -5,7 +5,7 @@ APP_NAME="Sonos Macbar"
 EXECUTABLE_NAME="sonos_macbar"
 BUNDLE_EXECUTABLE_NAME="SonosMacbar"
 BUNDLE_ID="${SONOS_MACBAR_BUNDLE_ID:-de.alania-bonn.sonos-macbar}"
-VERSION="${SONOS_MACBAR_VERSION:-0.2.5}"
+VERSION="${SONOS_MACBAR_VERSION:-0.2.6}"
 SCRATCH_DIR="${TMPDIR:-/tmp}/sonos_macbar-swiftpm-build"
 DIST_DIR="${SONOS_MACBAR_DIST_DIR:-dist}"
 APP_DIR="${DIST_DIR}/${APP_NAME}.app"
@@ -98,7 +98,7 @@ cat > "${CONTENTS_DIR}/Info.plist" <<PLIST
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSLocalNetworkUsageDescription</key>
-    <string>Sonos Macbar uses your local network to adjust your Sonos equalizer.</string>
+    <string>Sonos Macbar uses your local network to find and control your Sonos speakers.</string>
     <key>NSBonjourServices</key>
     <array>
         <string>_sonos._tcp</string>

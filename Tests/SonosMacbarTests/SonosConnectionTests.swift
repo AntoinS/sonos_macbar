@@ -1,10 +1,75 @@
 import Foundation
 import Testing
+import UPnPCast
 import os
 @testable import sonos_macbar
 
 @Suite(.serialized)
 struct SonosConnectionTests {
+    @Test func localPollingUpdatesVolumeTwicePerSecond() {
+        var polling = SonosPollingSchedule(mode: .local)
+        let now = ContinuousClock.now
+        polling.beginRoomRefresh(at: now)
+        #expect(polling.timeUntilNextRead(at: now) == .milliseconds(500))
+        for milliseconds in [500, 1000, 1500] {
+            let time = now.advanced(by: .milliseconds(milliseconds))
+            #expect(polling.timeUntilNextRead(at: time) == .zero)
+            let includeSource = polling.beginPlayerRefresh(at: time)
+            #expect(!includeSource)
+        }
+        let includeSource = polling.beginPlayerRefresh(at: now.advanced(by: .seconds(2)))
+        #expect(includeSource)
+    }
+
+    @Test @MainActor func localModeFindsAndControlsTheBeamWithoutASession() async throws {
+        let location = try #require(URL(string: "http://192.168.1.12:1400/xml/device_description.xml"))
+        let description = """
+            <root><device><UDN>uuid:RINCON_BEAM</UDN><modelName>Sonos Beam</modelName><serviceList>
+            <service><serviceType>urn:schemas-upnp-org:service:ZoneGroupTopology:1</serviceType><controlURL>/ZoneGroupTopology/Control</controlURL></service>
+            <service><serviceType>urn:schemas-upnp-org:service:RenderingControl:1</serviceType><controlURL>/MediaRenderer/RenderingControl/Control</controlURL></service>
+            <service><serviceType>urn:schemas-upnp-org:service:AVTransport:1</serviceType><controlURL>/MediaRenderer/AVTransport/Control</controlURL></service>
+            </serviceList></device></root>
+            """
+        let device = try UPnPDevice.parse(Data(description.utf8), descriptionURL: location)
+        let topology = """
+            <ZoneGroups><ZoneGroup Coordinator="RINCON_BEAM">
+              <ZoneGroupMember UUID="RINCON_BEAM" ZoneName="Living Room"><Satellite UUID="RINCON_SUB"/></ZoneGroupMember>
+              <ZoneGroupMember UUID="RINCON_HIDDEN" ZoneName="Hidden" Invisible="1"/>
+            </ZoneGroup></ZoneGroups>
+            """
+        #expect(try SonosLocalService.rooms(from: topology).map(\.id) == ["RINCON_BEAM"])
+        let output = [
+            "GetZoneGroupState": "<ZoneGroupState>\(xmlEscape(topology))</ZoneGroupState>",
+            "GetVolume": "<CurrentVolume>35</CurrentVolume>",
+            "GetMute": "<CurrentMute>0</CurrentMute>",
+            "GetPositionInfo": "<TrackURI>x-sonos-spotify:abc</TrackURI>",
+            "GetEQ": "<CurrentValue>0</CurrentValue>",
+            "SetVolume": "",
+            "SetMute": "",
+            "SetEQ": ""
+        ]
+        StubSonosHTTP.reset(actions: output.mapValues { .init(status: 200, body: $0) })
+        let service = SonosLocalService(session: StubSonosHTTP.session()) { _ in [device] }
+        let state = SonosState(service: service, connectionMode: .local)
+
+        await state.loadPlayers()
+        #expect(!state.canConnectSonos)
+        let room = try #require(state.selectedPlayer)
+        #expect(room.roomName == "Living Room")
+        #expect(room.playbackSource == "Spotify")
+        #expect(room.volume == 35)
+        #expect(room.supportsEnhanceDialog && room.supportsNightMode)
+        #expect(state.connectionStatus(for: .german) == "Lokal verbunden")
+
+        await state.commitVolume(38)
+        await state.setMuted(true)
+        await state.setNightMode(true)
+        #expect(state.selectedPlayer?.volume == 38)
+        #expect(state.selectedPlayer?.muted == true)
+        #expect(state.selectedPlayer?.nightMode == true)
+        #expect(StubSonosHTTP.hosts == ["192.168.1.12"])
+    }
+
     @Test func pollingKeepsItsCooldownAcrossPopoverReopens() {
         var polling = SonosPollingSchedule()
         let now = ContinuousClock.now
@@ -196,15 +261,22 @@ private final class StubSonosHTTP: URLProtocol, @unchecked Sendable {
 
     private struct State {
         var replies: [Reply]
+        var actions: [String: Reply] = [:]
+        var hosts: Set<String> = []
         var requestCount = 0
     }
 
     private static let state = OSAllocatedUnfairLock(initialState: State(replies: []))
 
     static var requestCount: Int { state.withLock { $0.requestCount } }
+    static var hosts: Set<String> { state.withLock { $0.hosts } }
 
     static func reset(_ replies: [Reply]) {
         state.withLock { $0 = State(replies: replies) }
+    }
+
+    static func reset(actions: [String: Reply]) {
+        state.withLock { $0 = State(replies: [], actions: actions) }
     }
 
     static func session() -> URLSession {
@@ -220,6 +292,13 @@ private final class StubSonosHTTP: URLProtocol, @unchecked Sendable {
     override func startLoading() {
         let reply = Self.state.withLock { state -> Reply? in
             state.requestCount += 1
+            if let host = request.url?.host { state.hosts.insert(host) }
+            if let header = request.value(forHTTPHeaderField: "SOAPACTION"),
+               let action = header.split(separator: "#").last?.trimmingCharacters(in: CharacterSet(charactersIn: "\"")),
+               var routed = state.actions[action] {
+                routed.body = "<Envelope><Body><\(action)Response>\(routed.body)</\(action)Response></Body></Envelope>"
+                return routed
+            }
             return state.replies.isEmpty ? nil : state.replies.removeFirst()
         }
         guard let reply, let url = request.url,

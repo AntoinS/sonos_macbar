@@ -28,6 +28,7 @@
 - 📡 See the current playback source at a glance
 - 🔁 Keep the volume slider in sync with external remote changes
 - 🔇 Mute your Sonos with one click
+- 🏠 Switch between local network and Sonos Cloud control in Settings
 - 🎚️ Adjust bass, treble and loudness in a dedicated Equalizer view. Rooms with a bonded Sonos Sub or Sub Mini also get a Sub level slider.
 - 🗣️ Toggle Voice enhancement
 - 🌙 Toggle Night mode
@@ -53,17 +54,23 @@
 
 1. Start **Sonos Macbar**.
 2. Click the Sonos icon in the macOS menu bar.
-3. Connect your Sonos account in the browser.
+3. Choose **Local** or **Cloud** under **Settings → Control Mode**.
 4. Control your speaker without opening the full Sonos app.
 
-No tokens need to be copied or pasted. The app keeps the connection in the
-macOS Keychain.
+In **Local** mode, Macbar discovers and controls speakers on your home network
+without Sonos sign-in. While the popover is open, it checks volume and mute
+about every half second and checks the source and home theater modes about
+every two seconds.
+
+In **Cloud** mode, connect your Sonos account in the browser. Macbar keeps the
+connection in the macOS Keychain and uses longer polling intervals.
 
 Select the **Equalizer** icon next to Settings to open the EQ for the selected
 room. Bass, treble and Sub level use the same slider design as the volume
 control. Select **×** to return to the control panel.
 
-Your Mac and Sonos speaker must be on the same local network. If prompted,
+For local control and the equalizer, your Mac and Sonos speaker must be on the
+same local network. If prompted,
 allow local network access under **System Settings → Privacy & Security →
 Local Network**.
 

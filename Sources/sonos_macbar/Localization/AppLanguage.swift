@@ -190,6 +190,16 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         }
     }
 
+    var controlMode: String { isGerman ? "Steuerung" : "Control Mode" }
+    var localMode: String { isGerman ? "Lokal" : "Local" }
+    var connectedLocally: String { isGerman ? "Lokal verbunden" : "Connected locally" }
+    var searchingLocalRooms: String { isGerman ? "Suche nach Sonos im Heimnetz …" : "Looking for Sonos on the network…" }
+    var localNetworkHelp: String {
+        isGerman
+            ? "Verbinde Mac und Sonos mit demselben Heimnetz und erlaube Macbar Zugriff auf das lokale Netzwerk."
+            : "Connect your Mac and Sonos to the same network and allow Local Network access for Macbar."
+    }
+
     func connectionIssueTitle(for issue: SonosConnectionIssue) -> String {
         switch issue {
         case .rateLimited:
@@ -198,6 +208,8 @@ enum AppLanguage: String, CaseIterable, Identifiable {
             isGerman ? "Sitzungsprüfung fehlgeschlagen" : "Session Check Failed"
         case .cloudRequestFailed:
             isGerman ? "Cloud-Steuerung gestört" : "Cloud Control Unavailable"
+        case .localRequestFailed:
+            isGerman ? "Sonos im Heimnetz nicht erreichbar" : "Sonos Unavailable on the Local Network"
         }
     }
 
@@ -218,6 +230,8 @@ enum AppLanguage: String, CaseIterable, Identifiable {
             return isGerman
                 ? "Die letzte Anfrage an die Sonos-Cloud ist fehlgeschlagen."
                 : "The latest request to the Sonos cloud failed."
+        case .localRequestFailed:
+            return localNetworkHelp
         }
     }
 

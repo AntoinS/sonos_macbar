@@ -20,7 +20,10 @@ struct SonosMacbarApp: App {
         OAuthCallbackRouter.shared.handler = { [state] url in
             state.handleOAuthCallback(url)
         }
-        SonosMacbarAppDelegate.state = state
+        SonosMacbarAppDelegate.states = (
+            cloud: state,
+            local: SonosState(service: SonosLocalService(), connectionMode: .local)
+        )
     }
 
     var body: some Scene {
@@ -37,9 +40,9 @@ private final class StatusBarController: NSObject, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var contextMenu: NSMenu?
-    private var state: SonosState?
+    private var states: [SonosState] = []
 
-    func configure(state: SonosState) {
+    func configure(cloud: SonosState, local: SonosState) {
         guard statusItem == nil else { return }
 
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -58,7 +61,7 @@ private final class StatusBarController: NSObject, NSPopoverDelegate {
         popover.animates = true
         popover.contentSize = NSSize(width: 340, height: 1)
         popover.contentViewController = NSHostingController(
-            rootView: ControlPanelView(state: state)
+            rootView: ControlPanelView(cloudState: cloud, localState: local)
                 .frame(width: 340)
         )
 
@@ -75,15 +78,15 @@ private final class StatusBarController: NSObject, NSPopoverDelegate {
         self.statusItem = statusItem
         self.popover = popover
         self.contextMenu = menu
-        self.state = state
+        self.states = [cloud, local]
     }
 
     func popoverWillShow(_ notification: Notification) {
-        state?.isPopoverOpen = true
+        states.forEach { $0.isPopoverOpen = true }
     }
 
     func popoverWillClose(_ notification: Notification) {
-        state?.isPopoverOpen = false
+        states.forEach { $0.isPopoverOpen = false }
     }
 
     private static func menuBarIcon() -> NSImage? {
@@ -157,7 +160,7 @@ private final class OAuthCallbackRouter {
 }
 
 private final class SonosMacbarAppDelegate: NSObject, NSApplicationDelegate {
-    @MainActor static var state: SonosState?
+    @MainActor static var states: (cloud: SonosState, local: SonosState)?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSAppleEventManager.shared().setEventHandler(
@@ -169,8 +172,8 @@ private final class SonosMacbarAppDelegate: NSObject, NSApplicationDelegate {
 
         Task { @MainActor in
             AppUpdater.shared.start()
-            guard let state = Self.state else { return }
-            StatusBarController.shared.configure(state: state)
+            guard let states = Self.states else { return }
+            StatusBarController.shared.configure(cloud: states.cloud, local: states.local)
         }
     }
 

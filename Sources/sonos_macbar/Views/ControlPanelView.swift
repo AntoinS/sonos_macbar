@@ -1,12 +1,23 @@
 import SwiftUI
 
 struct ControlPanelView: View {
-    @Bindable var state: SonosState
+    let cloudState: SonosState
+    let localState: SonosState
+    @AppStorage("sonosConnectionMode") private var connectionMode = SonosConnectionMode.cloud
     @AppStorage(AppLanguage.storageKey) private var appLanguageRawValue = AppLanguage.english.rawValue
     @State private var page: Page = .controls
 
     private enum Page {
         case controls, equalizer, settings
+    }
+
+    private struct PollingTarget: Equatable {
+        let mode: SonosConnectionMode
+        let playerID: SonosPlayer.ID?
+    }
+
+    private var state: SonosState {
+        connectionMode == .local ? localState : cloudState
     }
 
     private var appLanguage: AppLanguage {
@@ -16,7 +27,12 @@ struct ControlPanelView: View {
     var body: some View {
         Group {
             if page == .settings {
-                SettingsView(state: state, language: appLanguage, appLanguageRawValue: $appLanguageRawValue) {
+                SettingsView(
+                    state: state,
+                    language: appLanguage,
+                    appLanguageRawValue: $appLanguageRawValue,
+                    connectionMode: $connectionMode
+                ) {
                     page = .controls
                 }
             } else if page == .equalizer, let player = state.selectedPlayer {
@@ -72,7 +88,7 @@ struct ControlPanelView: View {
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 4)
-                    } else if let errorMessage = state.errorMessage, state.rateLimitedUntil == nil {
+                    } else if let errorMessage = state.errorMessage, state.rateLimitedUntil == nil, connectionMode == .cloud {
                         Text(errorMessage)
                             .font(.footnote)
                             .foregroundStyle(.red)
@@ -86,10 +102,16 @@ struct ControlPanelView: View {
         .background(.regularMaterial)
         .background {
             if state.isPopoverOpen {
-                Color.clear.task(id: state.selectedPlayerID) {
+                Color.clear.task(id: PollingTarget(mode: connectionMode, playerID: state.selectedPlayerID)) { [state] in
                     await state.pollSelectedPlayerState()
                 }
             }
+        }
+        .onChange(of: connectionMode) { previous, _ in
+            let previousState = previous == .local ? localState : cloudState
+            previousState.cancelPendingVolumeUpdate()
+            if state.selectedPlayerID == nil { state.selectedPlayerID = previousState.selectedPlayerID }
+            if page == .equalizer { page = .controls }
         }
         .onChange(of: state.selectedPlayer?.id) { _, id in
             if id == nil, page == .equalizer { page = .controls }
@@ -179,11 +201,15 @@ private struct SonosConnectionView: View {
     }
 
     private var title: String {
+        if state.connectionMode == .local {
+            return state.isLoading ? language.searchingLocalRooms : language.connectionIssueTitle(for: .localRequestFailed)
+        }
         if let issue = state.connectionIssue { return language.connectionIssueTitle(for: issue) }
         return language.connectionTitle(for: connectionState)
     }
 
     private var message: String {
+        if state.connectionMode == .local { return language.localNetworkHelp }
         if let issue = state.connectionIssue { return language.connectionIssueMessage(for: issue) }
         return language.connectionMessage(for: connectionState)
     }
@@ -205,7 +231,8 @@ private struct SonosConnectionView: View {
     }
 
     private var showsProgress: Bool {
-        switch connectionState {
+        if state.connectionMode == .local { return state.isLoading }
+        return switch connectionState {
         case .checking, .openingBrowser, .waitingForAuthorization, .refreshing:
             true
         default:
@@ -237,8 +264,12 @@ struct PanelHeader: View {
 }
 
 #Preview {
-    let state = SonosState(service: MockSonosService())
-    ControlPanelView(state: state)
+    let cloud = SonosState(service: MockSonosService())
+    let local = SonosState(service: MockSonosService(), connectionMode: .local)
+    ControlPanelView(cloudState: cloud, localState: local)
         .frame(width: 340)
-        .task { await state.loadPlayers() }
+        .task {
+            cloud.isPopoverOpen = true
+            local.isPopoverOpen = true
+        }
 }

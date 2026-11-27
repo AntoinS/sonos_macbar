@@ -1,5 +1,10 @@
 import Foundation
 
+enum SonosConnectionMode: String, CaseIterable {
+    case cloud
+    case local
+}
+
 enum SonosAuthState: Equatable {
     case checking
     case notConfigured
@@ -20,4 +25,5 @@ enum SonosConnectionIssue: Equatable {
     case rateLimited(retryAt: Date)
     case sessionUnavailable
     case cloudRequestFailed
+    case localRequestFailed
 }

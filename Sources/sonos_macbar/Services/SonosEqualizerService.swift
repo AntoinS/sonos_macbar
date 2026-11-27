@@ -1,5 +1,4 @@
 import Foundation
-import Network
 import UPnPCast
 
 enum EqualizerControl: CaseIterable, Sendable {
@@ -70,14 +69,10 @@ struct EqualizerConnection: Sendable {
 }
 
 enum SonosEqualizerService {
-    private static let zonePlayer = "urn:schemas-upnp-org:device:ZonePlayer:1"
-    private static let topologyService = "urn:schemas-upnp-org:service:ZoneGroupTopology:1"
-
     static func connect(to playerID: SonosPlayer.ID) async throws -> EqualizerConnection {
-        let session = localSession()
-        let device = try await findDevice(for: playerID, session: session)
-        guard let rendering = device.service(ofType: UPnPServiceType.renderingControl),
-              isLocalEndpoint(rendering.controlURL, host: device.descriptionURL.host) else {
+        let session = SonosLocalDiscovery.localSession()
+        let device = try await SonosLocalDiscovery.findDevice(for: playerID, session: session)
+        guard let rendering = SonosLocalDiscovery.service(ofType: UPnPServiceType.renderingControl, on: device) else {
             throw SonosAPIError.playerNotFound
         }
 
@@ -107,8 +102,7 @@ enum SonosEqualizerService {
     private static func readSubLevel(
         for playerID: SonosPlayer.ID, device: UPnPDevice, client: SOAPClient, rendering: UPnPService
     ) async -> Int? {
-        guard let topology = device.service(ofType: topologyService),
-              isLocalEndpoint(topology.controlURL, host: device.descriptionURL.host),
+        guard let topology = SonosLocalDiscovery.service(ofType: SonosLocalDiscovery.topologyService, on: device),
               let response = try? await client.invoke("GetZoneGroupState", on: topology),
               let xml = response["ZoneGroupState"],
               hasBondedSub(in: xml, for: playerID) else { return nil }
@@ -131,93 +125,4 @@ enum SonosEqualizerService {
         }
     }
 
-    private static func findDevice(for playerID: SonosPlayer.ID, session: URLSession) async throws -> UPnPDevice {
-        if let location = await bonjourLocation(for: playerID),
-           let device = try? await loadDevice(at: location, for: playerID, session: session) {
-            return device
-        }
-
-        for try await response in SSDP.search(target: zonePlayer) {
-            try Task.checkCancellation()
-            guard matches(response, playerID: playerID),
-                  let device = try? await loadDevice(at: response.location, for: playerID, session: session) else { continue }
-            return device
-        }
-        try Task.checkCancellation()
-        throw SonosAPIError.playerNotFound
-    }
-
-    private static func loadDevice(at url: URL, for playerID: SonosPlayer.ID, session: URLSession) async throws -> UPnPDevice {
-        let device = try await UPnPDevice.load(from: url, session: session)
-        guard device.udn.caseInsensitiveCompare("uuid:\(playerID)") == .orderedSame else {
-            throw SonosAPIError.playerNotFound
-        }
-        return device
-    }
-
-    private static func bonjourLocation(for playerID: SonosPlayer.ID) async -> URL? {
-        let browser = NWBrowser(for: .bonjourWithTXTRecord(type: "_sonos._tcp", domain: "local."), using: .tcp)
-        let (locations, continuation) = AsyncStream<URL>.makeStream(bufferingPolicy: .bufferingNewest(1))
-        browser.browseResultsChangedHandler = { results, _ in
-            for result in results {
-                guard case let .bonjour(record) = result.metadata,
-                      let location = bonjourLocation(in: record, for: playerID) else { continue }
-                continuation.yield(location)
-                return
-            }
-        }
-        browser.stateUpdateHandler = { state in
-            if case .failed = state { continuation.finish() }
-        }
-        browser.start(queue: .global(qos: .utility))
-
-        let timeout = Task {
-            try? await Task.sleep(for: .seconds(3))
-            continuation.finish()
-        }
-        defer {
-            timeout.cancel()
-            browser.cancel()
-            continuation.finish()
-        }
-        for await location in locations { return location }
-        return nil
-    }
-
-    static func bonjourLocation(in record: NWTXTRecord, for playerID: SonosPlayer.ID) -> URL? {
-        guard record["uuid"]?.caseInsensitiveCompare(playerID) == .orderedSame,
-              let location = record["location"].flatMap(URL.init(string:)),
-              let host = location.host,
-              IPv4Address(host) != nil,
-              isLocalEndpoint(location, host: host),
-              location.path == "/xml/device_description.xml" else { return nil }
-        return location
-    }
-
-    static func matches(_ response: SSDPResponse, playerID: SonosPlayer.ID) -> Bool {
-        response.uuid?.caseInsensitiveCompare("uuid:\(playerID)") == .orderedSame
-            && isLocalEndpoint(response.location, host: response.sourceAddress)
-    }
-
-    private static func isLocalEndpoint(_ url: URL, host: String?) -> Bool {
-        url.scheme == "http" && url.port == 1400 && url.host == host
-            && url.user == nil && url.password == nil
-    }
-
-    private static func localSession() -> URLSession {
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForResource = 10
-        configuration.urlCredentialStorage = nil
-        configuration.httpCookieStorage = nil
-        return URLSession(configuration: configuration, delegate: NoRedirects(), delegateQueue: nil)
-    }
-
-    private final class NoRedirects: NSObject, URLSessionTaskDelegate {
-        func urlSession(
-            _ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
-            newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void
-        ) {
-            completionHandler(nil)
-        }
-    }
 }
