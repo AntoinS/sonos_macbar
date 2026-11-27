@@ -54,7 +54,8 @@
 
 1. Start **Sonos Macbar**.
 2. Click the Sonos icon in the macOS menu bar.
-3. Choose **Local** or **Cloud** under **Settings → Control Mode**.
+3. At the bottom of **Settings**, choose **Local** or **Cloud** under
+   **Control Mode**. Select the info icon to see how the modes differ.
 4. Control your speaker without opening the full Sonos app.
 
 In **Local** mode, Macbar discovers and controls speakers on your home network

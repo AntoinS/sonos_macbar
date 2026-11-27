@@ -192,6 +192,17 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 
     var controlMode: String { isGerman ? "Steuerung" : "Control Mode" }
     var localMode: String { isGerman ? "Lokal" : "Local" }
+    var controlModeInfo: String { isGerman ? "Lokal und Cloud erklärt" : "About Local and Cloud" }
+    var localModeHelp: String {
+        isGerman
+            ? "Direkt im selben Heimnetz, mit schnelleren Statusupdates und ohne Sonos-Anmeldung."
+            : "Direct on the same home network, with faster status updates and no Sonos sign-in."
+    }
+    var cloudModeHelp: String {
+        isGerman
+            ? "Über dein Sonos-Konto, auch von unterwegs. Sonos begrenzt die Zahl der Anfragen."
+            : "Via your Sonos account, even away from home. Sonos limits the number of requests."
+    }
     var connectedLocally: String { isGerman ? "Lokal verbunden" : "Connected locally" }
     var searchingLocalRooms: String { isGerman ? "Suche nach Sonos im Heimnetz …" : "Looking for Sonos on the network…" }
     var localNetworkHelp: String {

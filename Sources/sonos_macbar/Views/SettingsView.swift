@@ -9,6 +9,7 @@ struct SettingsView: View {
 
     @State private var isConfirmingDisconnect = false
     @State private var isDisconnecting = false
+    @State private var showsControlModeInfo = false
 
     var body: some View {
         VStack(spacing: 10) {
@@ -16,8 +17,6 @@ struct SettingsView: View {
 
             PanelCard {
                 VStack(spacing: 0) {
-                    connectionModeRow.padding(10)
-                    rowDivider
                     connectionRow.padding(10)
 
                     if !state.players.isEmpty || (state.isConnected && !state.isLoading) {
@@ -37,6 +36,8 @@ struct SettingsView: View {
                     languageRow.padding(10)
                     rowDivider
                     AppUpdateView(language: language).padding(10)
+                    rowDivider
+                    connectionModeFooter
                 }
             }
         }
@@ -99,21 +100,50 @@ struct SettingsView: View {
         .controlSize(.small)
     }
 
-    private var connectionModeRow: some View {
-        HStack(spacing: 8) {
-            PanelIcon("network", tint: .blue)
-            Text(language.controlMode)
-            Spacer()
-            Picker(language.controlMode, selection: $connectionMode) {
-                Text(language.localMode).tag(SonosConnectionMode.local)
-                Text("Cloud").tag(SonosConnectionMode.cloud)
+    private var connectionModeFooter: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 2) {
+                Text(language.controlMode)
+                    .foregroundStyle(.secondary)
+
+                Button {
+                    showsControlModeInfo.toggle()
+                } label: {
+                    Image(systemName: showsControlModeInfo ? "info.circle.fill" : "info.circle")
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(language.controlModeInfo)
+                .accessibilityAddTraits(showsControlModeInfo ? .isSelected : [])
+                .help(language.controlModeInfo)
+
+                Spacer()
+
+                Picker(language.controlMode, selection: $connectionMode) {
+                    Text(language.localMode).tag(SonosConnectionMode.local)
+                    Text("Cloud").tag(SonosConnectionMode.cloud)
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
             }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .frame(width: 132)
+
+            if showsControlModeInfo {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(Text(language.localMode).bold()) · \(language.localModeHelp)")
+                    Text("\(Text("Cloud").bold()) · \(language.cloudModeHelp)")
+                }
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 4)
+            }
         }
-        .font(.callout)
+        .font(.caption)
         .controlSize(.small)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
     }
 
     private var roomRow: some View {
